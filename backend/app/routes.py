@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from app.extensions import db
 from app.models import User, RestaurantProfile, Offer, Claim, Leaderboard
 from app.services.auth_service import AuthService
+from app.services.qr_service import QRService 
 import math
 import uuid
 from sqlalchemy import desc
@@ -31,30 +32,9 @@ def login():
 
 @main.route('/api/offers/create', methods=['POST'])
 def create_offer():
-    try:
-        data = request.get_json()
-        
-        restaurant = RestaurantProfile.query.filter_by(owner_user_id=data.get('user_id')).first()
-        
-        if not restaurant:
-            return jsonify({"message": "Restaurant profile not found. Please log in again."}), 404
-
-        new_offer = Offer(
-            restaurant_id=restaurant.id,
-            title=data.get('title'),
-            type=data.get('type'), 
-            description=data.get('description'),
-            quantity=int(data.get('quantity', 1)),
-            discount_rate=int(data.get('discount_rate', 0)),
-            status='active'
-        )
-        db.session.add(new_offer)
-        db.session.commit()
-        
-        return jsonify({"message": "Offer successfully created"}), 201
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"message": "A server error occurred while creating the offer."}), 500
+    data = request.get_json()
+    result = QRService.create_offer(data)
+    return jsonify(result), result.get('status', 400)
 
 @main.route('/api/offers', methods=['GET'])
 def get_offers():
@@ -88,7 +68,7 @@ def get_offers():
                 except Exception as inner_e:
                     print(f"Offer processing error: {inner_e}")
                     continue
-                
+            
         output.sort(key=lambda x: x['distance'])
         return jsonify(output)
     except Exception as e:
@@ -96,38 +76,15 @@ def get_offers():
 
 @main.route('/api/offers/claim', methods=['POST'])
 def claim_offer():
-    try:
-        data = request.get_json()
-        offer = Offer.query.get(data.get('offer_id'))
-        
-        if not offer or offer.quantity < 1:
-            return jsonify({"message": "Sorry, this item is sold out."}), 400
-            
-        offer.quantity -= 1
-        
-        unique_code = f"{offer.id}-{uuid.uuid4().hex[:6].upper()}"
-        
-        new_claim = Claim(
-            user_id=data.get('user_id'), 
-            offer_id=offer.id, 
-            qr_code=unique_code,
-            status='pending'
-        )
-        db.session.add(new_claim)
-        
-        lb = Leaderboard.query.filter_by(restaurant_id=offer.restaurant_id).first()
-        if not lb:
-            lb = Leaderboard(restaurant_id=offer.restaurant_id, points=0, meals_shared=0)
-            db.session.add(lb)
-        
-        lb.meals_shared += 1
-        lb.points += 10 
-        
-        db.session.commit()
-        return jsonify({"message": "Order received", "qr_code": unique_code}), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"message": str(e)}), 500
+    data = request.get_json()
+    result = QRService.claim_offer(data.get('user_id'), data.get('offer_id'))
+    return jsonify(result), result.get('status', 400)
+
+@main.route('/api/claims/verify', methods=['POST'])
+def verify_claim():
+    data = request.get_json()
+    result = QRService.verify_claim_qr(data.get('qr_code'))
+    return jsonify(result), result.get('status', 400)
 
 @main.route('/api/student/history/<int:user_id>', methods=['GET'])
 def get_student_history(user_id):

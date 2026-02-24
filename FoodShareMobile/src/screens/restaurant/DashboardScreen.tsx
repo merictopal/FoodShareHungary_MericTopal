@@ -18,6 +18,7 @@ import { COLORS, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
+import { LeaderboardModal } from '../../components/LeaderboardModal';
 
 // --- MAIN COMPONENT ---
 const DashboardScreen = () => {
@@ -33,6 +34,8 @@ const DashboardScreen = () => {
   
   const [loading, setLoading] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  // State for Leaderboard Modal visibility
+  const [isLeaderboardVisible, setIsLeaderboardVisible] = useState(false);
 
   // --- ACTIONS: QR VERIFICATION ---
   const handleVerify = async () => {
@@ -146,9 +149,20 @@ const DashboardScreen = () => {
       >
         
         {/* --- WELCOME SECTION --- */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeSub}>{t('hello')},</Text>
-          <Text style={styles.welcomeTitle}>{user?.name}</Text>
+        <View style={[styles.welcomeSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View>
+            <Text style={styles.welcomeSub}>{t('hello')},</Text>
+            <Text style={styles.welcomeTitle}>{user?.name}</Text>
+          </View>
+          
+          {/* Leaderboard Trigger Button */}
+          <TouchableOpacity 
+            style={styles.leaderboardBtn}
+            onPress={() => setIsLeaderboardVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.leaderboardBtnText}>🏆 {t('leaderboard') || 'Rankings'}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* --- QR VERIFICATION CARD --- */}
@@ -312,6 +326,12 @@ const DashboardScreen = () => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+      
+      {/* --- LEADERBOARD MODAL --- */}
+      <LeaderboardModal 
+        visible={isLeaderboardVisible} 
+        onClose={() => setIsLeaderboardVisible(false)} 
+      />
 
     </KeyboardAvoidingView>
   );
@@ -359,6 +379,23 @@ const styles = StyleSheet.create({
     fontWeight: '900', 
     color: COLORS.textMain,
     letterSpacing: -0.5
+  },
+
+  // Leaderboard Button Styles
+  leaderboardBtn: {
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FEF08A',
+    ...SHADOWS.light,
+  },
+  leaderboardBtnText: {
+    color: '#CA8A04', // Dark golden text
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
 
   // Card Styles
