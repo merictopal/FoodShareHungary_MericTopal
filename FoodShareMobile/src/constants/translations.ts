@@ -116,6 +116,11 @@ export const TRANSLATIONS: any = {
     pending_approvals: 'Onay Bekleyen İşletmeler',
     approve: 'ONAYLA',
     no_pending: 'Onay bekleyen yeni kayıt yok.',
+
+    // --- LEADERBOARD & MODALS ---
+    leaderboard: 'Liderlik Tablosu',
+    meals_shared: 'Yemek Paylaşıldı',
+    no_data: 'Henüz veri bulunmuyor.',
   },
   
   en: {
@@ -231,6 +236,11 @@ export const TRANSLATIONS: any = {
     pending_approvals: 'Pending Approvals',
     approve: 'APPROVE',
     no_pending: 'No pending registrations at the moment.',
+
+    // --- LEADERBOARD & MODALS ---
+    leaderboard: 'Leaderboard',
+    meals_shared: 'Meals Shared',
+    no_data: 'No data available yet.',
   },
 
   hu: {
@@ -346,5 +356,10 @@ export const TRANSLATIONS: any = {
     pending_approvals: 'Jóváhagyásra Vár',
     approve: 'JÓVÁHAGYÁS',
     no_pending: 'Nincs függőben lévő regisztráció.',
+
+    // --- LEADERBOARD & MODALS ---
+    leaderboard: 'Ranglista',
+    meals_shared: 'Megosztott Ételek',
+    no_data: 'Még nincs adat.',
   }
 };
