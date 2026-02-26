@@ -1,6 +1,7 @@
 from app.extensions import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from geoalchemy2 import Geometry # PHASE 2: PostGIS Spatial Integration
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -9,7 +10,7 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), default='student') # student, restaurant, admin
+    role = db.Column(db.String(20), default='student') # Roles: student, restaurant, admin
     verification_status = db.Column(db.String(20), default='unverified') 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -18,7 +19,7 @@ class User(db.Model):
 
     @property
     def password(self):
-        raise AttributeError('Şifre okunamaz!')
+        raise AttributeError('Password is not readable!')
 
     @password.setter
     def password(self, password):
@@ -43,8 +44,16 @@ class RestaurantProfile(db.Model):
     owner_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(255), nullable=True)
+    
+    # Legacy coordinates (Kept for backward compatibility during transition)
     lat = db.Column(db.Float, nullable=True)
     lng = db.Column(db.Float, nullable=True)
+    
+    # --- PHASE 2: Architecture Stabilization & PostGIS Spatial Integration ---
+    # geom: Stores the exact geographic location of the restaurant.
+    # geometry_type='POINT': Represents a single coordinate pair on the map.
+    # srid=4326: Standard WGS 84 GPS coordinate system.
+    geom = db.Column(Geometry(geometry_type='POINT', srid=4326))
     
     offers = db.relationship('Offer', backref='restaurant', lazy=True)
     leaderboard_entry = db.relationship('Leaderboard', backref='restaurant', uselist=False)
@@ -57,12 +66,15 @@ class Offer(db.Model):
     
     title = db.Column(db.String(100), nullable=True)
     description = db.Column(db.String(255), nullable=False)
-    type = db.Column(db.String(20), nullable=False) # free / discount
+    type = db.Column(db.String(20), nullable=False) # Offer types: free / discount
+    
     quantity = db.Column(db.Integer, default=1)
+    # --- PHASE 1 FIX: Added to track total vs remaining items for UI progress bar ---
+    original_quantity = db.Column(db.Integer, default=1) 
+    
     discount_rate = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='active') 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 class Claim(db.Model):
     __tablename__ = 'claims'
     

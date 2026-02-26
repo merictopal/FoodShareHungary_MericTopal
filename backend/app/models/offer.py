@@ -2,9 +2,7 @@ from datetime import datetime
 from app.extensions import db
 
 class Offer(db.Model):
-    """
-    Restoranların oluşturduğu yemek fırsatları.
-    """
+    
     __tablename__ = 'offers'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -30,7 +28,7 @@ class Offer(db.Model):
     claims = db.relationship('Claim', backref='offer', lazy='dynamic')
 
     def to_dict(self):
-        """API için ilan detayları"""
+        
         return {
             'id': self.id,
             'restaurant': self.restaurant.name,
@@ -48,10 +46,7 @@ class Offer(db.Model):
 
 
 class Claim(db.Model):
-    """
-    Öğrencilerin 'Al' butonuna bastığında oluşan işlem kaydı.
-    QR kod bu tabloya bağlıdır.
-    """
+    
     __tablename__ = 'claims'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +63,6 @@ class Claim(db.Model):
     validated_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
-        """Geçmiş siparişler listesi için"""
         return {
             'id': self.id,
             'offer_title': self.offer.title,

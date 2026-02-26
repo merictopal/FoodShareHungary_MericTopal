@@ -3,24 +3,14 @@ from app.extensions import db
 from app.models import User, RestaurantProfile, Offer, Claim, Leaderboard
 from app.services.auth_service import AuthService
 from app.services.qr_service import QRService 
-import math
 import uuid
-from sqlalchemy import desc
+from sqlalchemy import desc, func # PHASE 2: PostGIS spatial database functions
 
 main = Blueprint('main', __name__)
 
-def calculate_distance(lat1, lon1, lat2, lon2):
-    if not lat1 or not lat2: return 0.0
-    try:
-        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
-        R = 6371 
-        dLat = math.radians(lat2 - lat1)
-        dLon = math.radians(lon2 - lon1)
-        a = math.sin(dLat/2) * math.sin(dLat/2) + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dLon/2) * math.sin(dLon/2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        return round(R * c, 2)
-    except:
-        return 0.0
+# --- PHASE 2: ARCHITECTURE STABILIZATION ---
+# Distance calculations are completely offloaded to the PostGIS spatial database engine 
+# for maximum performance and scalability.
 
 @main.route('/api/auth/register', methods=['POST'])
 def register():
@@ -42,36 +32,36 @@ def get_offers():
         user_lat = float(request.args.get('lat', 41.0082))
         user_lng = float(request.args.get('lng', 28.9784))
         
-        offers = Offer.query.filter(Offer.status == 'active', Offer.quantity > 0).all()
-        output = []
+        # 1. Convert user's latitude and longitude into a PostGIS Geometry Point
+        user_location = func.ST_SetSRID(func.ST_MakePoint(user_lng, user_lat), 4326)
         
-        for offer in offers:
-            rest = offer.restaurant
-            if rest:
-                try:
-                    r_lat = float(rest.lat) if rest.lat else 41.0082
-                    r_lng = float(rest.lng) if rest.lng else 28.9784
-                    
-                    dist = calculate_distance(user_lat, user_lng, r_lat, r_lng)
-                    
-                    output.append({
-                        'id': offer.id,
-                        'restaurant': rest.name,
-                        'type': offer.type,
-                        'description': offer.description,
-                        'quantity': offer.quantity,
-                        'discount_rate': offer.discount_rate,
-                        'lat': r_lat,
-                        'lng': r_lng,
-                        'distance': dist
-                    })
-                except Exception as inner_e:
-                    print(f"Offer processing error: {inner_e}")
-                    continue
+        # 2. Calculate distance in meters using ST_DistanceSphere, then convert to km
+        distance_calc = (func.ST_DistanceSphere(RestaurantProfile.geom, user_location) / 1000).label('distance')
+        
+        # 3. Query the database and order by exact spatial distance
+        results = db.session.query(Offer, RestaurantProfile, distance_calc)\
+            .join(RestaurantProfile, Offer.restaurant_id == RestaurantProfile.id)\
+            .filter(Offer.status == 'active', Offer.quantity > 0)\
+            .order_by(distance_calc)\
+            .all()
             
-        output.sort(key=lambda x: x['distance'])
+        output = []
+        for offer, rest, dist in results:
+            output.append({
+                'id': offer.id,
+                'restaurant': rest.name,
+                'type': offer.type,
+                'description': offer.description,
+                'quantity': offer.quantity,
+                'discount_rate': offer.discount_rate,
+                'lat': rest.lat, 
+                'lng': rest.lng,
+                'distance': round(dist, 2) if dist is not None else 0.0
+            })
+            
         return jsonify(output)
     except Exception as e:
+        print(f"PostGIS Spatial Query Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @main.route('/api/offers/claim', methods=['POST'])

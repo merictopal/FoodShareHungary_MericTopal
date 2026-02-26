@@ -1,6 +1,7 @@
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
+from geoalchemy2 import Geometry # Phase 2: Imported for PostGIS Spatial Integration
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -18,14 +19,12 @@ class User(db.Model):
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
     
     restaurant_profile = db.relationship('RestaurantProfile', backref='owner', uselist=False, cascade="all, delete-orphan")
     
     claims = db.relationship('Claim', backref='student', lazy='dynamic')
     
     notifications = db.relationship('Notification', backref='user', lazy='dynamic', cascade="all, delete-orphan")
-
 
     @property
     def password(self):
@@ -54,7 +53,6 @@ class User(db.Model):
 
 
 class RestaurantProfile(db.Model):
-
     __tablename__ = 'restaurant_profiles'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -66,8 +64,15 @@ class RestaurantProfile(db.Model):
     address = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
     
+    # Legacy coordinates (Kept for backward compatibility during transition)
     lat = db.Column(db.Float, default=47.4979)
     lng = db.Column(db.Float, default=19.0402)
+    
+    # --- PHASE 2: Architecture Stabilization & PostGIS Spatial Integration ---
+    # geom: Stores the exact geographic location of the restaurant.
+    # geometry_type='POINT': Represents a single coordinate pair on the map.
+    # srid=4326: Standard WGS 84 GPS coordinate system.
+    geom = db.Column(Geometry(geometry_type='POINT', srid=4326))
     
     offers = db.relationship('Offer', backref='restaurant', lazy='dynamic')
     
@@ -79,5 +84,6 @@ class RestaurantProfile(db.Model):
             'name': self.name,
             'description': self.description,
             'address': self.address,
+            # Returning legacy lat/lng until frontend fully adapts to PostGIS format
             'location': {'latitude': self.lat, 'longitude': self.lng}
         }
