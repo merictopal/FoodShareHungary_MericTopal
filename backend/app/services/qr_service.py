@@ -1,27 +1,13 @@
 import uuid
-import math
 from datetime import datetime
-# Notification tablosu Firebase ile değiştirileceği için import listesinden çıkarıldı
 from app.models import User, RestaurantProfile, Offer, Claim, Leaderboard
 from app.extensions import db
 
 class QRService:
 
-    @staticmethod
-    def calculate_distance(lat1, lon1, lat2, lon2):
-        """Calculates the Haversine distance between two coordinates in kilometers."""
-        if not lat1 or not lat2: return 0.0
-        
-        R = 6371 # Earth radius in km
-        dLat = math.radians(lat2 - lat1)
-        dLon = math.radians(lon2 - lon1)
-        
-        a = math.sin(dLat/2) * math.sin(dLat/2) + \
-            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
-            math.sin(dLon/2) * math.sin(dLon/2)
-            
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        return round(R * c, 2) 
+    # --- PHASE 2 CLEANUP ---
+    # The 'calculate_distance' function has been completely removed.
+    # Spatial distance calculations are now handled natively by PostGIS in routes.py.
 
     @staticmethod
     def create_offer(data):
@@ -42,11 +28,11 @@ class QRService:
                 title=data.get('title', 'Delicious Meal'),
                 description=data.get('description'),
                 type=data.get('type'), 
+                # FIXED: Storing the total amount at the time of creation
                 original_quantity=quantity,
-                current_quantity=quantity,
+                # FIXED: 'current_quantity' renamed to 'quantity' to match the database model
+                quantity=quantity,
                 discount_rate=discount_val,
-                pickup_start=data.get('pickup_start'),
-                pickup_end=data.get('pickup_end'),
                 status='active'
             )
             
@@ -73,13 +59,15 @@ class QRService:
             return {'success': False, 'message': 'Offer not found.', 'status': 404}
             
         # CRITICAL INVENTORY CHECK
-        if offer.current_quantity < 1 or offer.status != 'active':
+        # FIXED: 'current_quantity' updated to 'quantity'
+        if offer.quantity < 1 or offer.status != 'active':
             return {'success': False, 'message': 'Sorry, this item is sold out.', 'status': 400}
 
         try:
-            offer.current_quantity -= 1
+            # FIXED: 'current_quantity' updated to 'quantity'
+            offer.quantity -= 1
             
-            if offer.current_quantity == 0:
+            if offer.quantity == 0:
                 offer.status = 'sold_out'
 
             unique_code = f"OFF-{offer.id}-USR-{user_id}-{uuid.uuid4().hex[:6].upper()}"
