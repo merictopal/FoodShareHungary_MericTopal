@@ -20,6 +20,8 @@ import { offersApi } from '../../api/offers';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
+// Import the component to generate SVG-based QR codes
+import QRCode from 'react-native-qrcode-svg';
 
 // --- CONSTANTS & TYPES ---
 const { width } = Dimensions.get('window');
@@ -125,7 +127,7 @@ const ProfileScreen = ({ navigation }: any) => {
     // No need to reset activeTab to 'all'. The user stays on their current tab.
   }, []);
 
-  // --- FILTERING LOGIC (BUG FIXED) ---
+  // --- FILTERING LOGIC ---
   // The flatlist reads from THIS variable, not the raw history array.
   // When 'history' or 'activeTab' changes, this list recalculates automatically.
   const filteredHistory = useMemo(() => {
@@ -135,7 +137,6 @@ const ProfileScreen = ({ navigation }: any) => {
 
   // --- ACTIONS ---
   const handleLogout = () => {
-    // Replaced hardcoded Turkish text with dynamic translation
     Alert.alert(
       t('logout'), 
       t('logout_confirm_msg'), 
@@ -307,7 +308,6 @@ const ProfileScreen = ({ navigation }: any) => {
       {loading ? (
         <View style={styles.centerBox}>
            <ActivityIndicator size="large" color={COLORS.primary} />
-           {/* Fallback to simple text, assuming user understands "Loading" globally */}
            <Text style={styles.loadingText}>Loading...</Text>
         </View>
       ) : (
@@ -366,9 +366,15 @@ const ProfileScreen = ({ navigation }: any) => {
                 </View>
                 
                 <View style={styles.qrContainer}>
-                  <View style={styles.qrBorder}>
-                     <Text style={styles.qrData}>{selectedQr}</Text>
-                  </View>
+                  {/* Render the actual QR Code graphic. */}
+                  {selectedQr && (
+                    <QRCode
+                      value={selectedQr} 
+                      size={200}
+                      color="black"
+                      backgroundColor="transparent"
+                    />
+                  )}
                 </View>
                 
                 <Text style={styles.modalInfo}>

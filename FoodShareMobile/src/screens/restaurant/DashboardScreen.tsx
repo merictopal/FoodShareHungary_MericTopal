@@ -19,11 +19,16 @@ import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { LeaderboardModal } from '../../components/LeaderboardModal';
+// Import the navigation hook
+import { useNavigation } from '@react-navigation/native';
 
 // --- MAIN COMPONENT ---
 const DashboardScreen = () => {
   // --- CONTEXT & HOOKS ---
   const { user, logout, t, changeLanguage, lang } = useAuth();
+  
+  // Initialize the navigation object
+  const navigation = useNavigation<any>(); 
   
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState<'free' | 'discount'>('free');
@@ -180,6 +185,10 @@ const DashboardScreen = () => {
                 autoCapitalize="characters"
               />
             </View>
+            <Button 
+              title="Scan QR Code" 
+              onPress={() => navigation.navigate('Scanner')} 
+              />
             <Button 
               title={t('verify_btn')} 
               onPress={handleVerify} 
