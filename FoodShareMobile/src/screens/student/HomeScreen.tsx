@@ -11,9 +11,16 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
-  ScrollView
+  ScrollView,
+  PermissionsAndroid,
+  Modal, 
+  TouchableWithoutFeedback
 } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+// Import the officially supported community geolocation package
+import Geolocation from '@react-native-community/geolocation';
+import QRCode from 'react-native-qrcode-svg';
+
 import { useAuth } from '../../context/AuthContext';
 import { offersApi } from '../../api/offers';
 import { client } from '../../api/client';
@@ -57,20 +64,79 @@ const HomeScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  
+  // State to hold the QR code string after a successful claim
+  const [claimedQr, setClaimedQr] = useState<string | null>(null);
 
-  // Default Region
+  // We set the default region to Budapest (Project Theme) instead of Istanbul
+  // This acts as a fallback if the user denies GPS permissions
   const [region, setRegion] = useState<Region>({
-    latitude: 41.0082,
-    longitude: 28.9784,
+    latitude: 47.4979, 
+    longitude: 19.0402,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
 
+  // Keep track of the actual user GPS location to send to the backend
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  // --- LOCATION PERMISSIONS & ACQUISITION ---
+  const requestLocationPermission = async (): Promise<boolean> => {
+    if (Platform.OS === 'ios') {
+      const auth = await Geolocation.requestAuthorization('whenInUse');
+      return auth === 'granted';
+    }
+
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: "Location Permission",
+          message: "We need your location to show the distance to nearby food offers.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK"
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    return false;
+  };
+
+  const getCurrentLocation = async () => {
+    const hasPermission = await requestLocationPermission();
+
+    if (!hasPermission) {
+      // If no permission, fallback to default region and fetch data based on that
+      fetchData(region.latitude, region.longitude);
+      return;
+    }
+
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        setRegion(prev => ({ ...prev, latitude, longitude }));
+        fetchData(latitude, longitude);
+      },
+      (error) => {
+        // Use console.warn instead of console.error to avoid the red screen popup
+        console.warn("Geolocation Warning:", error.message);
+        
+        // Fallback to default coordinates immediately on error
+        fetchData(region.latitude, region.longitude);
+      },
+      // Optimize for emulator: short timeout (2s), allow cached locations (1 hour)
+      { enableHighAccuracy: false, timeout: 2000, maximumAge: 3600000 }
+    );
+  };
+
   // --- DATA FETCHING ---
-  const fetchData = async () => {
+  // Modified to accept dynamic coordinates from GPS
+  const fetchData = async (currentLat: number, currentLng: number) => {
     try {
       const [offersRes, leaderboardRes] = await Promise.all([
-        offersApi.getAll(user?.id || 0, region.latitude, region.longitude),
+        offersApi.getAll(user?.id || 0, currentLat, currentLng),
         client.get('/leaderboard')
       ]);
 
@@ -98,13 +164,12 @@ const HomeScreen = ({ navigation }: any) => {
   const strSafe = (val: any) => (val ? String(val).toLowerCase().trim() : 'free');
 
   useEffect(() => {
-    fetchData();
+    // Start the app flow by immediately requesting location
+    getCurrentLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- FILTERING LOGIC (BUG FIXED) ---
-  // Replaced the manual state override with a dynamic useMemo.
-  // Now, even when refreshing, the app remembers the active tab and filters accordingly.
+  // --- FILTERING LOGIC ---
   const filteredOffers = useMemo(() => {
     if (activeFilter === 'all') return allOffers;
     return allOffers.filter(item => item.type === activeFilter);
@@ -130,8 +195,13 @@ const HomeScreen = ({ navigation }: any) => {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchData();
-  }, []);
+    // Refresh using the latest known user location, or fallback to region
+    if (userLocation) {
+      fetchData(userLocation.lat, userLocation.lng);
+    } else {
+      getCurrentLocation();
+    }
+  }, [userLocation]);
 
   // --- CLAIM HANDLING ---
   const handleClaim = async (offerId: number, offerTitle: string) => {
@@ -150,11 +220,15 @@ const HomeScreen = ({ navigation }: any) => {
                 offer_id: offerId
               });
               
-              Alert.alert(
-                t('success'),
-                `${t('order_created')}\n\nCODE: ${res.data.qr_code}`,
-                [{ text: t('close_btn'), onPress: () => fetchData() }]
-              );
+              // Show the QR modal instead of a standard alert
+              setClaimedQr(res.data.qr_code);
+              
+              // Refresh data after successful claim using current location
+              if (userLocation) {
+                fetchData(userLocation.lat, userLocation.lng);
+              } else {
+                fetchData(region.latitude, region.longitude);
+              }
             } catch (error: any) {
               const msg = error.response?.data?.message || t('error');
               Alert.alert(t('error'), msg);
@@ -243,6 +317,7 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.cardInfo}>
           <View style={styles.cardHeaderRow}>
              <Text style={styles.cardTitle}>{item.restaurant}</Text>
+             {/* Displays the dynamic distance calculated directly by the PostGIS backend */}
              {item.distance !== undefined && (
                <Text style={styles.distText}>{item.distance} {t('dist_km')}</Text>
              )}
@@ -289,7 +364,9 @@ const HomeScreen = ({ navigation }: any) => {
           provider={PROVIDER_GOOGLE}
           style={styles.map}
           initialRegion={region}
-          showsUserLocation={true}
+          // Using region directly ensures the map always reflects our state
+          region={region}
+          showsUserLocation={false}
           showsMyLocationButton={false}
           customMapStyle={mapStyle} // Clean beige map theme
         >
@@ -376,7 +453,7 @@ const HomeScreen = ({ navigation }: any) => {
                   <Text style={styles.emptyTitle}>{t('empty_list')}</Text>
                   <Button 
                     title={t('refresh')} 
-                    onPress={fetchData} 
+                    onPress={onRefresh} 
                     style={{ marginTop: 24, width: 160 }} 
                   />
                 </View>
@@ -392,6 +469,49 @@ const HomeScreen = ({ navigation }: any) => {
           </ScrollView>
         )}
       </View>
+
+      {/* --- SUCCESS QR MODAL --- */}
+      <Modal
+        visible={!!claimedQr}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setClaimedQr(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setClaimedQr(null)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalCard}>
+                
+                <Text style={styles.modalTitleSuccess}>
+                  {t('success')}!
+                </Text>
+                
+                <Text style={styles.modalInfoText}>
+                  {t('order_created')}
+                </Text>
+
+                <View style={styles.qrCodeWrapper}>
+                  {claimedQr && (
+                    <QRCode
+                      value={claimedQr} 
+                      size={200}
+                      color="black"
+                      backgroundColor="transparent"
+                    />
+                  )}
+                </View>
+
+                <Button 
+                  title={t('close_btn')} 
+                  onPress={() => setClaimedQr(null)} 
+                  style={{ width: '100%' }} 
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
     </View>
   );
 };
@@ -546,7 +666,43 @@ const styles = StyleSheet.create({
   bgSuccess: { backgroundColor: COLORS.success },
   bgWarning: { backgroundColor: COLORS.warning },
   textSuccess: { color: COLORS.success },
-  textWarning: { color: COLORS.warning }
+  textWarning: { color: COLORS.warning },
+
+  // Modal Specific Styles
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 24 
+  },
+  modalCard: { 
+    width: '100%', 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 24, 
+    padding: 32, 
+    alignItems: 'center',
+    ...SHADOWS.heavy
+  },
+  modalTitleSuccess: { 
+    fontSize: 20, 
+    fontWeight: '900', 
+    color: COLORS.primary, 
+    marginBottom: 16 
+  },
+  modalInfoText: { 
+    fontSize: 14, 
+    color: COLORS.textSub, 
+    textAlign: 'center', 
+    marginBottom: 24,
+    fontWeight: '500'
+  },
+  qrCodeWrapper: { 
+    padding: 20, 
+    backgroundColor: '#F8F9FA', 
+    borderRadius: 20, 
+    marginBottom: 24 
+  }
 });
 
 export default HomeScreen;
