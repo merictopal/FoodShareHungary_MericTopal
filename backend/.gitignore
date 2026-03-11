@@ -16,3 +16,5 @@ env/
 .vscode/
 .idea/
 .DS_Store
+
+firebase-service-account.json

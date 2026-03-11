@@ -20,6 +20,9 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Store FCM token for Firebase Push Notifications
+    fcm_token = db.Column(db.String(255), nullable=True)
+    
     restaurant_profile = db.relationship('RestaurantProfile', backref='owner', uselist=False, cascade="all, delete-orphan")
     
     claims = db.relationship('Claim', backref='student', lazy='dynamic')

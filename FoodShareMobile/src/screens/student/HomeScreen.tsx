@@ -88,53 +88,90 @@ const HomeScreen = ({ navigation }: any) => {
     }
 
     if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: "Location Permission",
-          message: "We need your location to show the distance to nearby food offers.",
-          buttonNeutral: "Ask Me Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK"
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location Permission",
+            message: "We need your location to show the distance to nearby food offers.",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK"
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn("Permission request error:", err);
+        return false;
+      }
     }
     return false;
   };
 
   const getCurrentLocation = async () => {
-    const hasPermission = await requestLocationPermission();
+    let hasHandledLocation = false;
 
-    if (!hasPermission) {
-      // If no permission, fallback to default region and fetch data based on that
-      fetchData(region.latitude, region.longitude);
-      return;
-    }
-
-    Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-        setRegion(prev => ({ ...prev, latitude, longitude }));
-        fetchData(latitude, longitude);
-      },
-      (error) => {
-        // Use console.warn instead of console.error to avoid the red screen popup
-        console.warn("Geolocation Warning:", error.message);
-        
-        // Fallback to default coordinates immediately on error
+    // FIX: Failsafe Timeout
+    // If the geolocation takes more than 3 seconds (e.g. permission dialog stuck, GPS off),
+    // we force the data fetch using the default region so the user is not stuck on "Loading..."
+    const failsafeTimeout = setTimeout(() => {
+      if (!hasHandledLocation) {
+        console.warn("Geolocation timed out or stuck. Falling back to default region.");
+        hasHandledLocation = true;
         fetchData(region.latitude, region.longitude);
-      },
-      // Optimize for emulator: short timeout (2s), allow cached locations (1 hour)
-      { enableHighAccuracy: false, timeout: 2000, maximumAge: 3600000 }
-    );
+      }
+    }, 3000);
+
+    try {
+      const hasPermission = await requestLocationPermission();
+
+      if (!hasPermission) {
+        if (!hasHandledLocation) {
+          hasHandledLocation = true;
+          clearTimeout(failsafeTimeout);
+          fetchData(region.latitude, region.longitude);
+        }
+        return;
+      }
+
+      Geolocation.getCurrentPosition(
+        (position) => {
+          if (!hasHandledLocation) {
+            hasHandledLocation = true;
+            clearTimeout(failsafeTimeout);
+            const { latitude, longitude } = position.coords;
+            setUserLocation({ lat: latitude, lng: longitude });
+            setRegion(prev => ({ ...prev, latitude, longitude }));
+            fetchData(latitude, longitude);
+          }
+        },
+        (error) => {
+          console.warn("Geolocation Warning:", error.message);
+          if (!hasHandledLocation) {
+            hasHandledLocation = true;
+            clearTimeout(failsafeTimeout);
+            fetchData(region.latitude, region.longitude);
+          }
+        },
+        // Using low accuracy to speed up response time on emulators and weak signals
+        { enableHighAccuracy: false, timeout: 2500, maximumAge: 3600000 }
+      );
+    } catch (err) {
+      if (!hasHandledLocation) {
+        hasHandledLocation = true;
+        clearTimeout(failsafeTimeout);
+        fetchData(region.latitude, region.longitude);
+      }
+    }
   };
 
   // --- DATA FETCHING ---
   // Modified to accept dynamic coordinates from GPS
   const fetchData = async (currentLat: number, currentLng: number) => {
     try {
+      // Ensure we start loading if fetching manually
+      setLoading(true);
+
       const [offersRes, leaderboardRes] = await Promise.all([
         offersApi.getAll(user?.id || 0, currentLat, currentLng),
         client.get('/leaderboard')
@@ -155,6 +192,7 @@ const HomeScreen = ({ navigation }: any) => {
     } catch (error) {
       console.error("Error fetching home screen data:", error);
     } finally {
+      // THIS is the crucial part that stops the spinner
       setLoading(false);
       setRefreshing(false);
     }
@@ -164,8 +202,12 @@ const HomeScreen = ({ navigation }: any) => {
   const strSafe = (val: any) => (val ? String(val).toLowerCase().trim() : 'free');
 
   useEffect(() => {
-    // Start the app flow by immediately requesting location
-    getCurrentLocation();
+    // FIX: Delay location request slightly to prevent clashing with App.tsx Notification permission
+    const startUpTimeout = setTimeout(() => {
+      getCurrentLocation();
+    }, 500);
+
+    return () => clearTimeout(startUpTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

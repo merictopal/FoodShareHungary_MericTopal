@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from app.models import User, RestaurantProfile, Offer, Claim, Leaderboard
 from app.extensions import db
+# IMPORT NEW SERVICE
+from app.services.notification_service import NotificationService
 
 class QRService:
 
@@ -28,9 +30,7 @@ class QRService:
                 title=data.get('title', 'Delicious Meal'),
                 description=data.get('description'),
                 type=data.get('type'), 
-                # FIXED: Storing the total amount at the time of creation
                 original_quantity=quantity,
-                # FIXED: 'current_quantity' renamed to 'quantity' to match the database model
                 quantity=quantity,
                 discount_rate=discount_val,
                 status='active'
@@ -39,7 +39,9 @@ class QRService:
             db.session.add(new_offer)
             db.session.commit()
             
-            # Note: Real-time Push Notifications (FCM) will be implemented here in Phase 2 (March 15)
+            # TRIGGER FCM: Notify all students about the new offer
+            students = User.query.filter_by(role='student').all()
+            NotificationService.notify_students_new_offer(students, restaurant.name, new_offer.description)
             
             return {
                 'success': True,
@@ -59,12 +61,10 @@ class QRService:
             return {'success': False, 'message': 'Offer not found.', 'status': 404}
             
         # CRITICAL INVENTORY CHECK
-        # FIXED: 'current_quantity' updated to 'quantity'
         if offer.quantity < 1 or offer.status != 'active':
             return {'success': False, 'message': 'Sorry, this item is sold out.', 'status': 400}
 
         try:
-            # FIXED: 'current_quantity' updated to 'quantity'
             offer.quantity -= 1
             
             if offer.quantity == 0:
@@ -115,8 +115,10 @@ class QRService:
             
             points_to_add = 0
             offer = Offer.query.get(claim.offer_id)
+            restaurant = None
             
             if offer:
+                restaurant = RestaurantProfile.query.get(offer.restaurant_id)
                 lb = Leaderboard.query.get(offer.restaurant_id)
                 if not lb:
                     lb = Leaderboard(restaurant_id=offer.restaurant_id, points=0, meals_shared=0)
@@ -128,6 +130,13 @@ class QRService:
                 lb.meals_shared += 1
             
             db.session.commit()
+            
+            # TRIGGER FCM: Notify the restaurant owner that the claim was successfully verified
+            if restaurant:
+                owner = User.query.get(restaurant.owner_user_id)
+                student = User.query.get(claim.user_id)
+                student_name = student.name if student else "A student"
+                NotificationService.notify_restaurant_claim_verified(owner, student_name)
             
             return {
                 'success': True,

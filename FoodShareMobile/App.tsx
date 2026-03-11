@@ -15,12 +15,16 @@ const App = () => {
     const requestNotificationPermission = async () => {
       // 1. Request permission for Android 13+ (API 33+)
       if (Platform.OS === 'android' && Platform.Version >= 33) {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Notification permission denied by user.');
-          return;
+        try {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Notification permission denied by user.');
+            return;
+          }
+        } catch (err) {
+          console.warn('Permission request error:', err);
         }
       }
 
@@ -33,13 +37,15 @@ const App = () => {
         console.log('🔥 FIREBASE FCM TOKEN:', token);
         
       } catch (error: any) {
-        // Log silently if there is an error
         console.error('Error fetching FCM token:', error);
       }
     };
 
-    // Execute the permission request on app start
-    requestNotificationPermission();
+    // FIX: Delay the permission request slightly to ensure the Android Activity is fully attached to the view.
+    // 1000ms (1 second) is usually enough for React Native to finish rendering the initial layout.
+    const permissionTimeout = setTimeout(() => {
+      requestNotificationPermission();
+    }, 1000);
 
     // 3. Listen for real-time messages when the app is in the foreground
     const unsubscribe = messaging().onMessage(async remoteMessage => {
@@ -50,8 +56,11 @@ const App = () => {
       Alert.alert(title, body);
     });
 
-    // Cleanup the listener when the component unmounts
-    return unsubscribe;
+    // Cleanup the listener and timeout when the component unmounts
+    return () => {
+      clearTimeout(permissionTimeout);
+      unsubscribe();
+    };
   }, []);
 
   // Return the main app structure
