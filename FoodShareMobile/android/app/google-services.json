@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "302308395173",
+    "project_id": "foodsharehungary",
+    "storage_bucket": "foodsharehungary.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:302308395173:android:c4c92fcd6faf1eb1a7e54c",
+        "android_client_info": {
+          "package_name": "com.foodsharemobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZ8jc6ijxuUClnOFHiOK7grjx85FIEnMw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
