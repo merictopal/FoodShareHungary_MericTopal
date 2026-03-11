@@ -1,6 +1,9 @@
 import axios from 'axios';
+// Import environment variables securely
+import { API_URL } from '@env';
 
-const BASE_URL = 'http://10.0.2.2:5000/api'; 
+// Use the API_URL from the .env file
+const BASE_URL = API_URL; 
 
 export const client = axios.create({
   baseURL: BASE_URL,
@@ -10,6 +13,7 @@ export const client = axios.create({
   timeout: 10000, 
 });
 
+// Intercept responses to handle errors globally
 client.interceptors.response.use(
   response => response,
   error => {

@@ -117,3 +117,29 @@ class AuthService:
         except Exception as e:
             db.session.rollback()
             return {'success': False, 'message': 'Update error.', 'status': 500}
+
+    # --- NEW: FCM Token Management ---
+    @staticmethod
+    def update_fcm_token(data):
+        token = data.get('token')
+        user_id = data.get('user_id')
+
+        if not token:
+            return {'success': False, 'message': 'Token is required.', 'status': 400}
+
+        if user_id:
+            user = User.query.get(user_id)
+            if not user:
+                return {'success': False, 'message': 'User not found.', 'status': 404}
+            
+            try:
+                user.fcm_token = token
+                db.session.commit()
+                return {'success': True, 'message': 'FCM Token linked to user.', 'status': 200}
+            except Exception as e:
+                db.session.rollback()
+                return {'success': False, 'message': 'Database error.', 'status': 500}
+
+        # If there's no user_id (e.g. user just opened the app but didn't log in yet)
+        # We can just return success, or maybe store it somewhere else if needed later.
+        return {'success': True, 'message': 'FCM Token received without user assignment.', 'status': 200}
