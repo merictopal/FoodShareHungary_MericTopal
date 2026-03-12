@@ -28,3 +28,5 @@ def update_fcm_token():
     # Delegate the logic to the service layer
     result = AuthService.update_fcm_token(data)
     return jsonify(result), result['status']
+
+ 

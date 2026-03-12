@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.services.qr_service import QRService
+# NEW: Import NotificationService to trigger the real-time alerts
+from app.services.notification_service import NotificationService
 from app.models import Leaderboard
 # from app.utils.decorators import restaurant_required
 
@@ -16,7 +18,17 @@ def create_offer():
         
     result = QRService.create_offer(data)
     
-    # Using .get() for safety in case 'status' key is missing in the result dict
+    # --- 🚀 THE FINAL PIECE OF PHASE 2 - STAGE 3 ---
+    # If the offer was successfully saved to the database, fire the notification!
+    if result.get('success'):
+        try:
+            # Tell the notification service to alert students about this new meal
+            print("🚀 Offer created! Triggering push notifications for students...")
+            NotificationService.notify_students_new_offer(data)
+        except Exception as e:
+            # We use try-except so if notifications fail, the restaurant still sees "Success"
+            print(f"⚠️ Notification trigger failed (but offer was saved): {str(e)}")
+            
     return jsonify(result), result.get('status', 200)
 
 @restaurant_bp.route('/verify', methods=['POST'])

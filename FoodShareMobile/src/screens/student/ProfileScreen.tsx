@@ -62,6 +62,7 @@ const ProfileScreen = ({ navigation }: any) => {
   // Modals
   const [selectedQr, setSelectedQr] = useState<string | null>(null);
   const [langModalVisible, setLangModalVisible] = useState(false);
+  const [notifModalVisible, setNotifModalVisible] = useState(false); // NEW: Notification Modal State
   
   // Gamified Stats State
   const [stats, setStats] = useState<UserStats>({ 
@@ -72,6 +73,12 @@ const ProfileScreen = ({ navigation }: any) => {
     rank: 0,
     nextLevelPoints: 100 
   });
+
+  // Mock Notifications Data (To be replaced with real backend API in the future)
+  const mockNotifications = [
+    { id: 1, title: 'Welcome to FoodShare! 🎉', body: 'Start exploring offers around you.', time: 'Just now', unread: true },
+    { id: 2, title: 'New Level Unlocked', body: 'You reached Eco-Warrior Level!', time: '2 hours ago', unread: false }
+  ];
 
   // --- DATA FETCHING & GAMIFICATION LOGIC ---
   const fetchHistory = async () => {
@@ -156,6 +163,14 @@ const ProfileScreen = ({ navigation }: any) => {
     setLangModalVisible(false);
   };
 
+  const handleQuickMenuPress = (item: string) => {
+    if (item === 'notifications') {
+      setNotifModalVisible(true);
+    } else {
+      Alert.alert(t(item).toUpperCase(), "This feature will be available soon!");
+    }
+  };
+
   // --- RENDERERS ---
   const renderHeader = () => {
     const progressPercentage = stats.points > 0 ? (stats.points / stats.nextLevelPoints) * 100 : 0;
@@ -233,7 +248,12 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* 4. QUICK MENU CHIPS */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickMenu}>
           {['notifications', 'security', 'help'].map((item) => (
-             <TouchableOpacity key={item} style={styles.menuChip} activeOpacity={0.6}>
+             <TouchableOpacity 
+               key={item} 
+               style={styles.menuChip} 
+               activeOpacity={0.6}
+               onPress={() => handleQuickMenuPress(item)}
+             >
                 <Text style={styles.menuText}>{t(item).toUpperCase()}</Text>
              </TouchableOpacity>
           ))}
@@ -435,6 +455,44 @@ const ProfileScreen = ({ navigation }: any) => {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* --- NOTIFICATIONS MODAL --- */}
+      <Modal
+        visible={notifModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setNotifModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setNotifModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.notifModalCard}>
+                
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{t('notifications').toUpperCase()}</Text>
+                  <TouchableOpacity onPress={() => setNotifModalVisible(false)} hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}>
+                     <Text style={styles.closeIconText}>✕</Text>
+                   </TouchableOpacity>
+                </View>
+                
+                <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%', maxHeight: 400 }}>
+                  {mockNotifications.map((notif) => (
+                    <View key={notif.id} style={styles.notifCard}>
+                      <View style={styles.notifTextContainer}>
+                        <Text style={styles.notifTitle}>{notif.title}</Text>
+                        <Text style={styles.notifBody}>{notif.body}</Text>
+                        <Text style={styles.notifTime}>{notif.time}</Text>
+                      </View>
+                      {notif.unread && <View style={styles.notifUnreadDot} />}
+                    </View>
+                  ))}
+                </ScrollView>
+
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
     </View>
   );
 };
@@ -593,7 +651,24 @@ const styles = StyleSheet.create({
   langBadge: { backgroundColor: '#F5F5F5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   langBadgeActive: { backgroundColor: COLORS.primary },
   langBadgeText: { fontSize: 12, fontWeight: '800', color: COLORS.textSub },
-  langBadgeTextActive: { color: '#FFFFFF' }
+  langBadgeTextActive: { color: '#FFFFFF' },
+
+  // Notifications Modal Specific
+  notifModalCard: {
+    backgroundColor: '#FFFFFF', width: '100%',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+    padding: 32, alignItems: 'center', 
+    ...SHADOWS.heavy 
+  },
+  notifCard: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5'
+  },
+  notifTextContainer: { flex: 1, paddingRight: 16 },
+  notifTitle: { fontSize: 14, fontWeight: '800', color: COLORS.textMain, marginBottom: 4 },
+  notifBody: { fontSize: 12, color: COLORS.textSub, marginBottom: 6, lineHeight: 18 },
+  notifTime: { fontSize: 10, color: '#A0A0A0', fontWeight: '700' },
+  notifUnreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary }
 });
 
 export default ProfileScreen;
