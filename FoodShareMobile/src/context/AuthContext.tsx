@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/auth';
 import { TRANSLATIONS } from '../constants/translations';
 
+// NEW: Import messaging to get the token after successful login
+import messaging from '@react-native-firebase/messaging';
+
 // --- TYPE DEFINITIONS ---
 export type User = {
   id: number;
@@ -151,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- 6. LOGOUT OPERATION ---
+// --- 6. LOGOUT OPERATION ---
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -166,6 +169,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+// --- 7. NEW: SYNC FCM TOKEN WITH BACKEND (WITH DEBUG LOGS) ---
+  useEffect(() => {
+    console.log("🔄 [DEBUG] AuthContext useEffect triggered! User state is:", user);
+    
+    const syncToken = async () => {
+      if (!user) {
+        console.log("⚠️ [DEBUG] User is null. Skipping token sync (probably logged out).");
+        return;
+      }
+      
+      if (!user.id) {
+        console.log("❌ [DEBUG] User object exists, but 'user.id' is MISSING! Backend might not be sending it.");
+        return;
+      }
+
+      console.log(`✅ [DEBUG] User ID found: ${user.id}. Requesting Firebase token...`);
+      try {
+        const token = await messaging().getToken();
+        console.log(`🔥 [DEBUG] Firebase Token received! Sending to backend...`);
+        
+        // We are finally sending the token WITH the user's ID!
+        await authApi.updateFcmToken(token, user.id);
+        console.log(`✅ FCM Token successfully linked to User ID: ${user.id}`);
+      } catch (error) {
+        console.error('❌ Error linking FCM token:', error);
+      }
+    };
+
+    syncToken();
+  }, [user]);
+
+  // --- EARLY RETURN FOR INITIALIZATION ---
   // Return null or show a splash screen until app data is loaded
   if (!isInitialized) {
     return null; // Or a simple <ActivityIndicator />

@@ -1,5 +1,6 @@
 from app.models import User, RestaurantProfile
 from app.extensions import db
+from sqlalchemy import text
 
 class AuthService:
 
@@ -118,28 +119,38 @@ class AuthService:
             db.session.rollback()
             return {'success': False, 'message': 'Update error.', 'status': 500}
 
-    # --- NEW: FCM Token Management ---
+# --- FCM Token Management ---
     @staticmethod
     def update_fcm_token(data):
         token = data.get('token')
         user_id = data.get('user_id')
 
+        print("\n--- 🕵️‍♂️ FCM TOKEN DEBUG ---")
+        print(f"Received user_id: {user_id}")
+        print(f"Received token: {'YES' if token else 'NO'}")
+        print("--------------------------\n")
+
         if not token:
             return {'success': False, 'message': 'Token is required.', 'status': 400}
 
         if user_id:
+            # Check if user exists first
             user = User.query.get(user_id)
             if not user:
+                print("❌ ERROR: User ID not found in Database!")
                 return {'success': False, 'message': 'User not found.', 'status': 404}
             
             try:
-                user.fcm_token = token
+                # 🔨 THE SLEDGEHAMMER: Bypass ORM and FORCE the database to update using Raw SQL!
+                query = text("UPDATE users SET fcm_token = :t WHERE id = :uid")
+                db.session.execute(query, {'t': token, 'uid': user_id})
                 db.session.commit()
+                
+                print("✅ SUCCESS: Token FORCED into Database using RAW SQL!")
                 return {'success': True, 'message': 'FCM Token linked to user.', 'status': 200}
             except Exception as e:
                 db.session.rollback()
+                print(f"❌ ERROR: Database crash: {str(e)}")
                 return {'success': False, 'message': 'Database error.', 'status': 500}
 
-        # If there's no user_id (e.g. user just opened the app but didn't log in yet)
-        # We can just return success, or maybe store it somewhere else if needed later.
         return {'success': True, 'message': 'FCM Token received without user assignment.', 'status': 200}

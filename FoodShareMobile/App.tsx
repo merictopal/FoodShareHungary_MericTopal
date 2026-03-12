@@ -8,6 +8,9 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 
+// IMPORT NEW API SERVICE TO SEND TOKEN TO BACKEND
+import { authApi } from './src/api/auth';
+
 const App = () => {
   
   useEffect(() => {
@@ -36,6 +39,14 @@ const App = () => {
         // Log the token silently to the terminal for debugging purposes
         console.log('🔥 FIREBASE FCM TOKEN:', token);
         
+        // 3. SEND TOKEN TO BACKEND
+        try {
+          await authApi.updateFcmToken(token);
+          console.log('✅ Token successfully sent to backend!');
+        } catch (apiErr) {
+          console.error('❌ Failed to send token to backend:', apiErr);
+        }
+        
       } catch (error: any) {
         console.error('Error fetching FCM token:', error);
       }
@@ -47,7 +58,7 @@ const App = () => {
       requestNotificationPermission();
     }, 1000);
 
-    // 3. Listen for real-time messages when the app is in the foreground
+    // 4. Listen for real-time messages when the app is in the foreground
     const unsubscribe = messaging().onMessage(async remoteMessage => {
       const title = remoteMessage.notification?.title || 'New Alert! 🔔';
       const body = remoteMessage.notification?.body || 'Check out the new offers.';

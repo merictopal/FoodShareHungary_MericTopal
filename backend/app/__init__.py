@@ -14,8 +14,15 @@ def create_app(config_name='default'):
     db.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
     
-    from .routes import main
+    # --- BLUEPRINT REGISTRATION ---
+    
+    # FIXED: Import main from the newly renamed main_routes.py file to avoid folder name collision
+    from .main_routes import main
     app.register_blueprint(main)
+    
+    # NEW: Register the Auth Blueprint from the routes folder (now a proper package)
+    from .routes.auth_routes import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
     
     @app.errorhandler(404)
     def page_not_found(e):

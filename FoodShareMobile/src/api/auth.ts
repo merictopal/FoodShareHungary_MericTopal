@@ -20,9 +20,9 @@ export const authApi = {
   },
 
   // NEW: Send the Firebase Cloud Messaging (FCM) token to the backend
-  updateFcmToken: async (token: string, userId?: number) => {
-    // We will send the token so the backend knows where to send push notifications
-    const response = await client.post('/user/fcm-token', { token, user_id: userId });
-    return response.data;
-  }
+updateFcmToken: async (token: string, userId?: number) => {
+  // FIXED: Changed endpoint from /user/fcm-token to /auth/fcm-token to match backend
+  const response = await client.post('/auth/fcm-token', { token, user_id: userId });
+  return response.data;
+}
 };
