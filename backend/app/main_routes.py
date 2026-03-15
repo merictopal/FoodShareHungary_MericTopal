@@ -4,7 +4,8 @@ from app.models import User, RestaurantProfile, Offer, Claim, Leaderboard
 from app.services.auth_service import AuthService
 from app.services.qr_service import QRService 
 import uuid
-from sqlalchemy import desc, func # PHASE 2: PostGIS spatial database functions
+from sqlalchemy import desc, func
+from app.services.storage_service import StorageService
 
 main = Blueprint('main', __name__)
 
@@ -56,7 +57,8 @@ def get_offers():
                 'discount_rate': offer.discount_rate,
                 'lat': rest.lat, 
                 'lng': rest.lng,
-                'distance': round(dist, 2) if dist is not None else 0.0
+                'distance': round(dist, 2) if dist is not None else 0.0,
+                'image_url': offer.image_url 
             })
             
         return jsonify(output)
@@ -96,7 +98,8 @@ def get_student_history(user_id):
                     'type': real_offer.type, 
                     'date': claim.created_at.strftime('%d.%m.%Y %H:%M'),
                     'qr_code': claim.qr_code,
-                    'status': claim.status
+                    'status': claim.status,
+                    'image_url': real_offer.image_url
                 })
             
         return jsonify(output)
@@ -110,7 +113,7 @@ def get_leaderboard():
         leaders = Leaderboard.query.order_by(desc(Leaderboard.points)).limit(5).all()
         output = []
         for l in leaders:
-            rest_name = l.restaurant.name if l.restaurant else "Unnamed"
+            rest_name = l.restaurant_lb.name if l.restaurant_lb else "Unnamed"
             output.append({
                 'restaurant': rest_name,
                 'points': l.points,
@@ -118,60 +121,45 @@ def get_leaderboard():
             })
         return jsonify(output)
     except Exception as e:
+        print(f"Leaderboard Route Error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@main.route('/api/admin/stats', methods=['GET'])
-def get_admin_stats():
-    try:
-        total_users = User.query.count()
-        total_restaurants = User.query.filter_by(role='restaurant').count()
-        active_offers = Offer.query.filter_by(status='active').count()
-        total_claims = Claim.query.count()
+# --- PHASE 4: CLOUD STORAGE INTEGRATION ---
+@main.route('/api/upload/user-document', methods=['POST'])
+def upload_user_document():
+    # Check if the file is in the request
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
         
-        return jsonify({
-            'total_users': total_users,
-            'total_restaurants': total_restaurants,
-            'active_offers': active_offers,
-            'total_claims': total_claims
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    file = request.files['file']
+    user_id = request.form.get('user_id')
 
-@main.route('/api/admin/pending', methods=['GET'])
-def get_pending_approvals():
-    try:
-        pending_users = User.query.filter_by(role='restaurant', verification_status='pending').all()
-        
-        output = []
-        for user in pending_users:
-            profile = RestaurantProfile.query.filter_by(owner_user_id=user.id).first()
-            output.append({
-                'user_id': user.id,
-                'name': user.name,
-                'email': user.email,
-                'type': user.role,
-                'joined_at': user.created_at.strftime('%Y-%m-%d'),
-                'detail': profile.name if profile else "Unnamed Business"
-            })
-        
-        return jsonify(output)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
-@main.route('/api/admin/approve', methods=['POST'])
-def approve_user():
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
         user = User.query.get(user_id)
         if not user:
-            return jsonify({'message': 'User not found'}), 404
-            
-        user.verification_status = 'verified'
-        db.session.commit()
+            return jsonify({'error': 'User not found'}), 404
+
+        # DEPLOYMENT READY: Upload the file using StorageService (AWS S3 or Local Fallback)
+        upload_result = StorageService.upload_file(file, folder='id_documents')
         
-        return jsonify({'message': 'User approved', 'status': 'success'}), 200
+        if not upload_result.get('success'):
+            return jsonify({'error': upload_result.get('message', 'Upload failed')}), 500
+
+        user.verification_status = 'pending'
+        
+        # 🚀 THE FIX: Use the actual database column name: id_document_url
+        user.id_document_url = upload_result.get('url')
+        
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Document uploaded successfully', 
+            'file_url': user.id_document_url
+        }), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

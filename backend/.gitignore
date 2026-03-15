@@ -1,20 +1,26 @@
-# Python önbellek dosyaları
+# --- Python Cache Files ---
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Sanal Ortam (Virtual Environment)
+# --- Virtual Environments ---
 venv/
 env/
-.env
 
-# Veritabanı (Eğer yerel SQLite kullandıysak)
+# --- Environment Variables & Secrets (CRITICAL) ---
+.env
+firebase-service-account.json
+
+# --- Node/JavaScript Dependencies ---
+# This stops the 11,000+ files from tracking!
+node_modules/
+*/node_modules/
+
+# --- Databases ---
 *.sqlite3
 *.db
 
-# Editör dosyaları
+# --- IDE & OS Files ---
 .vscode/
 .idea/
 .DS_Store
-
-firebase-service-account.json

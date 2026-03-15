@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 class AuthService:
 
+    # --- REGISTER USER ---
     @staticmethod
     def register_user(data):
         email = data.get('email')
@@ -64,6 +65,7 @@ class AuthService:
                 'status': 500
             }
 
+    # --- LOGIN USER ---
     @staticmethod
     def login_user(data):
         email = data.get('email')
@@ -85,13 +87,19 @@ class AuthService:
                 'status': 403
             }
 
+        # 🚀 FIXED: Extract the dictionary and explicitly inject the verification_status 
+        # so the mobile app remembers if the user is 'pending', 'verified', or 'unverified'.
+        user_data = user.to_dict()
+        user_data['verification_status'] = user.verification_status
+
         return {
             'success': True,
             'message': 'Login successful.',
-            'user': user.to_dict(),
+            'user': user_data,
             'status': 200
         }
 
+    # --- UPDATE PROFILE ---
     @staticmethod
     def update_profile(data):
         user_id = data.get('user_id')
@@ -109,17 +117,22 @@ class AuthService:
 
         try:
             db.session.commit()
+            
+            # Ensure the updated data also includes verification_status
+            user_data = user.to_dict()
+            user_data['verification_status'] = user.verification_status
+            
             return {
                 'success': True,
                 'message': 'Profile updated.',
-                'user': user.to_dict(),
+                'user': user_data,
                 'status': 200
             }
         except Exception as e:
             db.session.rollback()
             return {'success': False, 'message': 'Update error.', 'status': 500}
 
-# --- FCM Token Management ---
+    # --- FCM TOKEN MANAGEMENT ---
     @staticmethod
     def update_fcm_token(data):
         token = data.get('token')

@@ -14,7 +14,8 @@ import {
   ScrollView,
   PermissionsAndroid,
   Modal, 
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Image // NEW: Imported to display offer photos from AWS S3
 } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 // Import the officially supported community geolocation package
@@ -42,6 +43,7 @@ export interface Offer {
   lat: number | string;
   lng: number | string;
   distance?: number;
+  image_url?: string; // NEW: Added image url to the main interface
 }
 
 export interface LeaderboardEntry {
@@ -183,7 +185,8 @@ const HomeScreen = ({ navigation }: any) => {
         lat: parseFloat(o.lat),
         lng: parseFloat(o.lng),
         // Ensure type is safely lowercase to match our tab filters exactly
-        type: strSafe(o.type)
+        type: strSafe(o.type),
+        image_url: o.image_url // NEW: Pull the image from the API response
       })).filter((o: any) => !isNaN(o.lat) && !isNaN(o.lng));
 
       setAllOffers(safeOffers);
@@ -246,7 +249,21 @@ const HomeScreen = ({ navigation }: any) => {
   }, [userLocation]);
 
   // --- CLAIM HANDLING ---
+// --- CLAIM HANDLING ---
   const handleClaim = async (offerId: number, offerTitle: string) => {
+    // NEW: Security Guard! Block unverified users from claiming meals.
+    if (user?.verification_status !== 'verified') {
+      Alert.alert(
+        t('error') || "Verification Required",
+        "You need to upload your student ID or support document from your profile to claim meals.",
+        [
+          { text: t('cancel') || "Cancel", style: "cancel" },
+          { text: "Go to Profile", onPress: () => navigation.navigate('Profile') }
+        ]
+      );
+      return; // Stop the execution here!
+    }
+
     Alert.alert(
       t('claim_btn'), 
       `${t('confirm_claim')} "${offerTitle}"?`,
@@ -262,10 +279,8 @@ const HomeScreen = ({ navigation }: any) => {
                 offer_id: offerId
               });
               
-              // Show the QR modal instead of a standard alert
               setClaimedQr(res.data.qr_code);
               
-              // Refresh data after successful claim using current location
               if (userLocation) {
                 fetchData(userLocation.lat, userLocation.lng);
               } else {
@@ -350,11 +365,16 @@ const HomeScreen = ({ navigation }: any) => {
         activeOpacity={0.7}
         onPress={() => animateToLocation(Number(item.lat), Number(item.lng))}
       >
-        <View style={[styles.cardIconBox, { backgroundColor: typeBgColor }]}>
-          <Text style={[styles.cardIconLetter, { color: typeColor }]}>
-             {item.restaurant.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        {/* NEW: Display image if available, otherwise show the fallback letter icon */}
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.cardIconImage} />
+        ) : (
+          <View style={[styles.cardIconBox, { backgroundColor: typeBgColor }]}>
+            <Text style={[styles.cardIconLetter, { color: typeColor }]}>
+               {item.restaurant.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.cardInfo}>
           <View style={styles.cardHeaderRow}>
@@ -656,6 +676,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', backgroundColor: '#FFFFFF',
     borderRadius: 20, padding: 16, marginHorizontal: 24, marginBottom: 16,
     alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6', ...SHADOWS.light
+  },
+  
+  // NEW: Added image styling
+  cardIconImage: {
+    width: 52, 
+    height: 52, 
+    borderRadius: 16,
+    marginRight: 16,
+    backgroundColor: '#EAECEF'
   },
   cardIconBox: {
     width: 52, height: 52, borderRadius: 16,

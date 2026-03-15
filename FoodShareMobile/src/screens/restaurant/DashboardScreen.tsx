@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
+  Image
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offersApi } from '../../api/offers';
@@ -19,15 +20,15 @@ import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { LeaderboardModal } from '../../components/LeaderboardModal';
-// Import the navigation hook
 import { useNavigation } from '@react-navigation/native';
+
+// Import image picker functions
+import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 
 // --- MAIN COMPONENT ---
 const DashboardScreen = () => {
   // --- CONTEXT & HOOKS ---
   const { user, logout, t, changeLanguage, lang } = useAuth();
-  
-  // Initialize the navigation object
   const navigation = useNavigation<any>(); 
   
   // --- STATE MANAGEMENT ---
@@ -37,16 +38,52 @@ const DashboardScreen = () => {
   const [qty, setQty] = useState('1');
   const [discount, setDiscount] = useState('');
   
+  // New state to hold the selected photo
+  const [photo, setPhoto] = useState<Asset | null>(null);
+  
   const [loading, setLoading] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-  // State for Leaderboard Modal visibility
   const [isLeaderboardVisible, setIsLeaderboardVisible] = useState(false);
+
+  // --- ACTIONS: IMAGE PICKER ---
+  const handleSelectImage = () => {
+    Keyboard.dismiss();
+    Alert.alert(
+      t('add_photo') || "Add Photo",
+      t('choose_photo_method') || "Choose a method to add a photo of your meal",
+      [
+        {
+          text: t('camera') || "Take Photo",
+          onPress: () => {
+            launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
+              if (response.assets && response.assets.length > 0) {
+                setPhoto(response.assets[0]);
+              }
+            });
+          }
+        },
+        {
+          text: t('gallery') || "Choose from Gallery",
+          onPress: () => {
+            launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+              if (response.assets && response.assets.length > 0) {
+                setPhoto(response.assets[0]);
+              }
+            });
+          }
+        },
+        { 
+          text: t('cancel') || "Cancel", 
+          style: "cancel" 
+        }
+      ]
+    );
+  };
 
   // --- ACTIONS: QR VERIFICATION ---
   const handleVerify = async () => {
-    // Prevent empty submissions
     if (!qrCode.trim()) {
-      Alert.alert(t('error'), 'Invalid code.'); // Simple fallback if not translated
+      Alert.alert(t('error'), 'Invalid code.'); 
       return;
     }
     
@@ -55,7 +92,6 @@ const DashboardScreen = () => {
     
     try {
       const res = await offersApi.verifyQr(qrCode.trim());
-      // Replaced hardcoded "Puan" with translated text
       Alert.alert(t('success'), `+${res.points || 10} ${t('saved')}!`);
       setQrCode('');
     } catch (e: any) {
@@ -68,7 +104,6 @@ const DashboardScreen = () => {
 
   // --- ACTIONS: CREATE OFFER ---
   const handleCreate = async () => {
-    // Prevent empty title submissions
     if (!title.trim()) {
       Alert.alert(t('error'), 'Missing information.'); 
       return;
@@ -81,25 +116,35 @@ const DashboardScreen = () => {
       const quantityNum = parseInt(qty) || 1; 
       const discountValue = activeTab === 'free' ? 0 : (parseInt(discount) || 0);
 
-      await offersApi.create({
+      const offerData = {
         user_id: user?.id,
         title: title.trim(),
         description: title.trim(),
         type: activeTab,
         quantity: quantityNum,
         discount_rate: discountValue
-      });
+      };
+
+      // 1. Check if a photo was selected, and use the appropriate API method
+      if (photo) {
+        // We will create this 'createWithImage' method in the next step (offers.ts)
+        await offersApi.createWithImage(offerData, photo);
+      } else {
+        // Fallback to the standard text-only creation if no photo is added
+        await offersApi.create(offerData);
+      }
       
       Alert.alert(t('success'), t('msg_offer_published'));
       
-      // Reset Form fields after successful creation
+      // 2. Reset Form fields
       setTitle(''); 
       setQty('1'); 
       setDiscount('');
       setActiveTab('free');
+      setPhoto(null); // Clear the photo preview
       
     } catch (e: any) {
-      console.error("Offer Creation Error:", e.response?.data);
+      console.error("Offer Creation Error:", e.response?.data || e.message);
       const errorMsg = e.response?.data?.message || t('error');
       Alert.alert(t('error'), errorMsg);
     } finally {
@@ -107,7 +152,6 @@ const DashboardScreen = () => {
     }
   };
 
-  // --- ACTIONS: LOGOUT CONFIRMATION ---
   const handleLogout = () => {
     setIsSettingsVisible(false);
     Alert.alert(
@@ -120,8 +164,6 @@ const DashboardScreen = () => {
     );
   };
 
-  // --- UI COMPONENTS: AVATAR ---
-  // Generates a sleek, circular avatar based on the restaurant's first letter
   const renderAvatar = () => {
     const initial = user?.name ? user.name.charAt(0).toUpperCase() : 'R';
     return (
@@ -131,16 +173,11 @@ const DashboardScreen = () => {
     );
   };
 
-  // --- RENDER ---
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* HEADER
-        Passes the renderAvatar function to display the profile circle.
-        Pressing it opens the new Settings Modal.
-      */}
       <Header 
         title={t('nav_rest')} 
         rightIcon={renderAvatar()} 
@@ -160,7 +197,6 @@ const DashboardScreen = () => {
             <Text style={styles.welcomeTitle}>{user?.name}</Text>
           </View>
           
-          {/* Leaderboard Trigger Button */}
           <TouchableOpacity 
             style={styles.leaderboardBtn}
             onPress={() => setIsLeaderboardVisible(true)}
@@ -173,7 +209,6 @@ const DashboardScreen = () => {
         {/* --- QR VERIFICATION CARD --- */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('verify_qr')}</Text>
-          {/* Dynamic translated description */}
           <Text style={styles.cardDescription}>{t('desc_verify_qr')}</Text>
           
           <View style={styles.row}>
@@ -202,10 +237,8 @@ const DashboardScreen = () => {
         {/* --- CREATE OFFER CARD --- */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('add_offer')}</Text>
-          {/* Dynamic translated description */}
           <Text style={styles.cardDescription}>{t('desc_add_offer')}</Text>
 
-          {/* Tab Slider (Free / Discount) */}
           <View style={styles.sliderContainer}>
             <TouchableOpacity 
               style={[styles.sliderBtn, activeTab === 'free' && styles.sliderBtnActive]} 
@@ -228,7 +261,6 @@ const DashboardScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Form Inputs (Placeholders replaced with translations) */}
           <Input 
             label={t('prod_name_ph')} 
             value={title} 
@@ -261,6 +293,22 @@ const DashboardScreen = () => {
           
           <View style={styles.publishSpacing} />
           
+          {/* --- IMAGE PICKER UI --- */}
+          <View style={styles.imagePickerContainer}>
+            {photo?.uri ? (
+              <View style={styles.previewContainer}>
+                <Image source={{ uri: photo.uri }} style={styles.previewImage} />
+                <TouchableOpacity onPress={handleSelectImage} style={styles.changePhotoBtn}>
+                  <Text style={styles.changePhotoText}>{t('change_photo') || "Change Photo"}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleSelectImage} style={styles.addPhotoBtn}>
+                <Text style={styles.addPhotoBtnText}>📸 {t('add_photo') || "+ Add Meal Photo"}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           <Button 
             title={t('publish')} 
             onPress={handleCreate} 
@@ -268,7 +316,6 @@ const DashboardScreen = () => {
           />
         </View>
         
-        {/* Bottom Padding for scroll area */}
         <View style={{ height: 40 }} />
 
       </ScrollView>
@@ -285,7 +332,6 @@ const DashboardScreen = () => {
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContent}>
                 
-                {/* Modal Header */}
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('nav_profile')}</Text>
                   <TouchableOpacity 
@@ -297,14 +343,12 @@ const DashboardScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Profile Info */}
                 <View style={styles.profileInfoBox}>
                   {renderAvatar()}
                   <Text style={styles.profileName}>{user?.name}</Text>
                   <Text style={styles.profileRole}>{t('role_rest')}</Text>
                 </View>
 
-                {/* Language Switcher */}
                 <Text style={styles.sectionLabel}>{t('lang_change')}</Text>
                 <View style={styles.langContainer}>
                   {['tr', 'en', 'hu'].map((l) => (
@@ -321,7 +365,6 @@ const DashboardScreen = () => {
                   ))}
                 </View>
 
-                {/* Logout Button */}
                 <TouchableOpacity 
                   style={styles.logoutBtn} 
                   onPress={handleLogout}
@@ -336,7 +379,6 @@ const DashboardScreen = () => {
         </TouchableWithoutFeedback>
       </Modal>
       
-      {/* --- LEADERBOARD MODAL --- */}
       <LeaderboardModal 
         visible={isLeaderboardVisible} 
         onClose={() => setIsLeaderboardVisible(false)} 
@@ -355,8 +397,6 @@ const styles = StyleSheet.create({
   scrollContent: { 
     padding: 24 
   },
-  
-  // Header Avatar
   avatarContainer: {
     width: 36,
     height: 36,
@@ -371,8 +411,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-
-  // Welcome Section
   welcomeSection: { 
     marginBottom: 28, 
     marginLeft: 4 
@@ -389,8 +427,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     letterSpacing: -0.5
   },
-
-  // Leaderboard Button Styles
   leaderboardBtn: {
     backgroundColor: '#FFFBEB',
     paddingHorizontal: 16,
@@ -401,13 +437,11 @@ const styles = StyleSheet.create({
     ...SHADOWS.light,
   },
   leaderboardBtnText: {
-    color: '#CA8A04', // Dark golden text
+    color: '#CA8A04', 
     fontWeight: '800',
     fontSize: 13,
     letterSpacing: 0.5,
   },
-
-  // Card Styles
   card: { 
     backgroundColor: '#FFFFFF', 
     padding: 24, 
@@ -430,8 +464,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
-  
-  // Form Elements
   row: { 
     flexDirection: 'row', 
     alignItems: 'flex-start' 
@@ -441,7 +473,7 @@ const styles = StyleSheet.create({
   },
   verifyBtn: { 
     marginLeft: 12,
-    height: 56, // Matches the Input component height perfectly
+    height: 56, 
     paddingHorizontal: 20,
     borderRadius: 12,
   },
@@ -451,8 +483,6 @@ const styles = StyleSheet.create({
   publishSpacing: {
     height: 10
   },
-
-  // Slider (Free / Discount)
   sliderContainer: { 
     flexDirection: 'row', 
     backgroundColor: '#EAECEF', 
@@ -480,10 +510,53 @@ const styles = StyleSheet.create({
     fontWeight: '800' 
   },
 
+  // --- IMAGE PICKER STYLES ---
+  imagePickerContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  addPhotoBtn: {
+    width: '100%',
+    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoBtnText: {
+    color: COLORS.textSub,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  previewContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  changePhotoBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+  },
+  changePhotoText: {
+    color: COLORS.textMain,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
   // --- MODAL STYLES ---
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(31, 41, 51, 0.4)', // Uses theme overlay logic
+    backgroundColor: 'rgba(31, 41, 51, 0.4)', 
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -520,8 +593,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSub,
     marginTop: -2,
   },
-  
-  // Modal Profile Section
   profileInfoBox: {
     alignItems: 'center',
     marginBottom: 30,
@@ -542,8 +613,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     letterSpacing: 1,
   },
-
-  // Modal Settings Section
   sectionLabel: {
     fontSize: 12,
     fontWeight: '800',
@@ -577,10 +646,8 @@ const styles = StyleSheet.create({
   langTextActive: { 
     color: COLORS.textMain 
   },
-
-  // Modal Logout Button
   logoutBtn: {
-    backgroundColor: '#FEF2F2', // Very soft red for warning
+    backgroundColor: '#FEF2F2', 
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
