@@ -16,13 +16,23 @@ def create_app(config_name='default'):
     
     # --- BLUEPRINT REGISTRATION ---
     
-    # FIXED: Import main from the newly renamed main_routes.py file to avoid folder name collision
+    # Import main from the newly renamed main_routes.py file to avoid folder name collision
     from .main_routes import main
     app.register_blueprint(main)
     
-    # NEW: Register the Auth Blueprint from the routes folder (now a proper package)
+    # Register the Auth Blueprint from the routes folder 
     from .routes.auth_routes import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    
+    # --- PHASE 4: CLOUD STORAGE INTEGRATION ---
+    # Register the Upload Blueprint for AWS S3 integration
+    from .routes.upload_routes import upload_bp
+    app.register_blueprint(upload_bp, url_prefix='/api/upload')
+
+    # --- ADMIN PANEL INTEGRATION ---
+    # NEW: Register the Admin Blueprint so Flask can route /api/admin requests
+    from .routes.admin_routes import admin_bp
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
     
     @app.errorhandler(404)
     def page_not_found(e):

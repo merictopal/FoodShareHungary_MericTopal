@@ -1,10 +1,11 @@
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
-from geoalchemy2 import Geometry # Phase 2: Imported for PostGIS Spatial Integration
+from geoalchemy2 import Geometry
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = {'extend_existing': True}
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -12,22 +13,17 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     
     role = db.Column(db.String(20), default='student', nullable=False)
-    
     verification_status = db.Column(db.String(20), default='unverified')
-    
-    verification_doc = db.Column(db.Text, nullable=True)
+    id_document_url = db.Column(db.String(500), nullable=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Store FCM token for Firebase Push Notifications
+    # REMOVED: updated_at and verification_doc columns to perfectly match the current PostgreSQL database schema
     fcm_token = db.Column(db.String(255), nullable=True)
     
-    restaurant_profile = db.relationship('RestaurantProfile', backref='owner', uselist=False, cascade="all, delete-orphan")
-    
-    claims = db.relationship('Claim', backref='student', lazy='dynamic')
-    
-    notifications = db.relationship('Notification', backref='user', lazy='dynamic', cascade="all, delete-orphan")
+    # Clean, single-source-of-truth relationships with fully qualified paths
+    restaurant_profile = db.relationship('app.models.user.RestaurantProfile', backref='owner', uselist=False, cascade="all, delete-orphan")
+    claims = db.relationship('app.models.offer.Claim', backref='student', lazy='dynamic')
+    notifications = db.relationship('app.models.stats.Notification', backref='user', lazy='dynamic', cascade="all, delete-orphan")
 
     @property
     def password(self):
@@ -48,7 +44,8 @@ class User(db.Model):
             'role': self.role,
             'status': self.verification_status,
             'joined_at': self.created_at.strftime('%d-%m-%Y'),
-            'restaurant_name': self.restaurant_profile.name if self.restaurant_profile else None
+            'restaurant_name': self.restaurant_profile.name if self.restaurant_profile else None,
+            'id_document_url': self.id_document_url
         }
 
     def __repr__(self):
@@ -57,29 +54,22 @@ class User(db.Model):
 
 class RestaurantProfile(db.Model):
     __tablename__ = 'restaurant_profiles'
-
+    __table_args__ = {'extend_existing': True}
+    
     id = db.Column(db.Integer, primary_key=True)
-    
     owner_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
-    
     name = db.Column(db.String(120), nullable=False) 
     description = db.Column(db.Text, nullable=True)
     address = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
-    
-    # Legacy coordinates (Kept for backward compatibility during transition)
+    profile_image_url = db.Column(db.String(500), nullable=True)
     lat = db.Column(db.Float, default=47.4979)
     lng = db.Column(db.Float, default=19.0402)
-    
-    # --- PHASE 2: Architecture Stabilization & PostGIS Spatial Integration ---
-    # geom: Stores the exact geographic location of the restaurant.
-    # geometry_type='POINT': Represents a single coordinate pair on the map.
-    # srid=4326: Standard WGS 84 GPS coordinate system.
     geom = db.Column(Geometry(geometry_type='POINT', srid=4326))
     
-    offers = db.relationship('Offer', backref='restaurant', lazy='dynamic')
-    
-    leaderboard_entry = db.relationship('Leaderboard', backref='restaurant', uselist=False)
+    # Explicit relationships with fully qualified paths to prevent registry collisions
+    offers = db.relationship('app.models.offer.Offer', backref='restaurant', lazy='dynamic')
+    leaderboard_entry = db.relationship('app.models.stats.Leaderboard', backref='restaurant_lb', uselist=False)
 
     def to_dict(self):
         return {
@@ -87,6 +77,6 @@ class RestaurantProfile(db.Model):
             'name': self.name,
             'description': self.description,
             'address': self.address,
-            # Returning legacy lat/lng until frontend fully adapts to PostGIS format
+            'profile_image_url': self.profile_image_url,
             'location': {'latitude': self.lat, 'longitude': self.lng}
         }

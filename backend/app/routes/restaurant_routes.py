@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
 from app.services.qr_service import QRService
-# NEW: Import NotificationService to trigger the real-time alerts
 from app.services.notification_service import NotificationService
-from app.models import Leaderboard
-# from app.utils.decorators import restaurant_required
+
+# 🚀 FIXED: Imported Leaderboard model correctly from stats
+from app.models.stats import Leaderboard
 
 restaurant_bp = Blueprint('restaurant', __name__)
 
@@ -42,13 +42,18 @@ def verify_claim():
 
 @restaurant_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
-    # Fetches the top 10 restaurants/users based on points
-    leaders = Leaderboard.query.order_by(Leaderboard.points.desc()).limit(10).all()
-    
-    output = []
-    for index, leader in enumerate(leaders):
-        data = leader.to_dict()
-        data['rank'] = index + 1 # Dynamically assign the leaderboard rank
-        output.append(data)
+    try:
+        # Fetches the top 10 restaurants/users based on points
+        leaders = Leaderboard.query.order_by(Leaderboard.points.desc()).limit(10).all()
         
-    return jsonify(output), 200
+        output = []
+        for index, leader in enumerate(leaders):
+            data = leader.to_dict()
+            data['rank'] = index + 1 # Dynamically assign the leaderboard rank
+            output.append(data)
+            
+        return jsonify(output), 200
+    except Exception as e:
+        # 🚀 FIXED: Added error handling so the Home Screen doesn't crash if the leaderboard fails.
+        print(f"Leaderboard Error: {str(e)}")
+        return jsonify([]), 200 # Return empty array instead of 500 error to save the Home Screen

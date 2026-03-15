@@ -39,13 +39,17 @@ class QRService:
             db.session.add(new_offer)
             db.session.commit()
             
+            # FIXED: Passed only the required 'data' dictionary to the notification service
+            # Ensure the restaurant name is included in the data dictionary
+            data['restaurant_name'] = restaurant.name 
+            
             # TRIGGER FCM: Notify all students about the new offer
-            students = User.query.filter_by(role='student').all()
-            NotificationService.notify_students_new_offer(students, restaurant.name, new_offer.description)
+            NotificationService.notify_students_new_offer(data)
             
             return {
                 'success': True,
                 'message': 'Offer published successfully!',
+                'offer_id': new_offer.id, # NEW: Crucial for linking the AWS S3 image upload to this specific offer
                 'status': 201
             }
         except Exception as e:

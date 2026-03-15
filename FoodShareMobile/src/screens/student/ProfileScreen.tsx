@@ -13,15 +13,19 @@ import {
   Modal, 
   ScrollView,
   Platform,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Image // NEW: Imported to show document preview
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offersApi } from '../../api/offers';
+import { client } from '../../api/client'; // NEW: Imported to send document to backend
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 // Import the component to generate SVG-based QR codes
 import QRCode from 'react-native-qrcode-svg';
+// NEW: Import image picker for document upload
+import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 
 // --- CONSTANTS & TYPES ---
 const { width } = Dimensions.get('window');
@@ -49,8 +53,7 @@ type TabType = 'all' | 'free' | 'discount';
 
 const ProfileScreen = ({ navigation }: any) => {
   // --- HOOKS & CONTEXT ---
-  const { user, logout, t, lang, changeLanguage } = useAuth();
-  
+  const { user, logout, t, lang, changeLanguage, updateUser } = useAuth();  
   // --- STATE MANAGEMENT ---
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +65,13 @@ const ProfileScreen = ({ navigation }: any) => {
   // Modals
   const [selectedQr, setSelectedQr] = useState<string | null>(null);
   const [langModalVisible, setLangModalVisible] = useState(false);
-  const [notifModalVisible, setNotifModalVisible] = useState(false); // NEW: Notification Modal State
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  
+  // NEW: Document Verification Modal States
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
+  const [docType, setDocType] = useState<'student' | 'pensioner' | 'social'>('student');
+  const [docImage, setDocImage] = useState<Asset | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   
   // Gamified Stats State
   const [stats, setStats] = useState<UserStats>({ 
@@ -166,14 +175,91 @@ const ProfileScreen = ({ navigation }: any) => {
   const handleQuickMenuPress = (item: string) => {
     if (item === 'notifications') {
       setNotifModalVisible(true);
+    } else if (item === 'security') {
+      // NEW: Quick access to document verification
+      setVerificationModalVisible(true);
     } else {
       Alert.alert(t(item).toUpperCase(), "This feature will be available soon!");
     }
   };
 
+  // --- NEW: DOCUMENT VERIFICATION ACTIONS ---
+  const handleSelectDocImage = () => {
+    Alert.alert(
+      "Upload Document",
+      "Choose a method to scan or upload your document",
+      [
+        {
+          text: "Camera",
+          onPress: () => {
+            launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
+              if (response.assets && response.assets.length > 0) {
+                setDocImage(response.assets[0]);
+              }
+            });
+          }
+        },
+        {
+          text: "Gallery",
+          onPress: () => {
+            launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+              if (response.assets && response.assets.length > 0) {
+                setDocImage(response.assets[0]);
+              }
+            });
+          }
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  // --- NEW: DOCUMENT VERIFICATION ACTIONS ---
+  const handleUploadDocument = async () => {
+    if (!docImage) {
+      Alert.alert("Error", "Please select or capture a document photo first.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('user_id', String(user?.id));
+      formData.append('document_type', docType);
+      formData.append('file', {
+        uri: docImage.uri,
+        type: docImage.type || 'image/jpeg',
+        name: docImage.fileName || `doc-user-${user?.id}.jpg`,
+      } as any);
+
+      await client.post('/upload/user-document', formData, { 
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (user) {
+        updateUser({ ...user, verification_status: 'pending' });
+      }
+
+      Alert.alert("Success!", "Your document has been sent. Our admin team will verify it shortly.");
+      setVerificationModalVisible(false);
+      setDocImage(null); 
+      
+    } catch (error: any) {
+      Alert.alert("Error", "Failed to upload document. Is the backend route correct?");
+      console.error("Upload Error:", error.response?.data || error.message);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  // --- RENDERERS ---
   // --- RENDERERS ---
   const renderHeader = () => {
     const progressPercentage = stats.points > 0 ? (stats.points / stats.nextLevelPoints) * 100 : 0;
+    
+    // Check verification status safely
+    const isVerified = user?.verification_status === 'verified';
+    const isPending = user?.verification_status === 'pending';
 
     return (
       <View style={styles.headerWrapper}>
@@ -199,8 +285,10 @@ const ProfileScreen = ({ navigation }: any) => {
             <Text style={styles.userEmail}>{user?.email}</Text>
             
             <View style={styles.badgeRow}>
-               <View style={styles.roleBadge}>
-                 <Text style={styles.roleText}>{t('role_student').toUpperCase()}</Text>
+               <View style={[styles.roleBadge, isVerified ? styles.badgeVerified : (isPending ? styles.badgePending : styles.badgeUnverified)]}>
+                 <Text style={[styles.roleText, isVerified ? styles.textVerified : (isPending ? styles.textPending : styles.textUnverified)]}>
+                    {isVerified ? t('verified') : (isPending ? t('pending') : t('unverified'))}
+                 </Text>
                </View>
                <View style={[styles.roleBadge, styles.rankBadge]}>
                  <Text style={styles.rankText}>RANK #{stats.rank || '--'}</Text>
@@ -208,6 +296,36 @@ const ProfileScreen = ({ navigation }: any) => {
             </View>
           </View>
         </View>
+
+        {/* NEW: DYNAMIC VERIFICATION BANNER */}
+        {isPending && (
+          <View style={[styles.verificationBanner, { backgroundColor: '#FFFBEB', borderColor: '#FEF08A' }]}>
+            <View style={[styles.bannerIconBox, { backgroundColor: '#FEF08A' }]}>
+              <Text style={[styles.bannerIconText, { color: '#D97706' }]}>⏳</Text>
+            </View>
+            <View style={styles.bannerTextContent}>
+              <Text style={[styles.bannerTitle, { color: '#D97706' }]}>Verification Pending</Text>
+              <Text style={[styles.bannerSub, { color: '#B45309' }]}>Our admin team is reviewing your document.</Text>
+            </View>
+          </View>
+        )}
+
+        {!isVerified && !isPending && (
+          <TouchableOpacity 
+            style={styles.verificationBanner} 
+            activeOpacity={0.8}
+            onPress={() => setVerificationModalVisible(true)}
+          >
+            <View style={styles.bannerIconBox}>
+              <Text style={styles.bannerIconText}>!</Text>
+            </View>
+            <View style={styles.bannerTextContent}>
+              <Text style={styles.bannerTitle}>Account Verification Required</Text>
+              <Text style={styles.bannerSub}>Upload your document to claim meals.</Text>
+            </View>
+            <Text style={styles.bannerArrow}>➤</Text>
+          </TouchableOpacity>
+        )}
 
         {/* 2. LEVEL PROGRESS BAR */}
         <View style={styles.progressContainer}>
@@ -367,6 +485,83 @@ const ProfileScreen = ({ navigation }: any) => {
          />
       </View>
 
+      {/* --- DOCUMENT VERIFICATION MODAL (NEW) --- */}
+      <Modal
+        visible={verificationModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setVerificationModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setVerificationModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.verificationModalCard}>
+                
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Verify Identity</Text>
+                  <TouchableOpacity onPress={() => setVerificationModalVisible(false)} hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}>
+                     <Text style={styles.closeIconText}>✕</Text>
+                   </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.docModalSub}>
+                  Select your document type. This helps us ensure meals go to the right people.
+                </Text>
+
+                {/* Document Type Selector */}
+                <View style={styles.docTypeContainer}>
+                  {[
+                    { id: 'student', label: 'Student ID / Transcript' },
+                    { id: 'pensioner', label: '65+ Age / Pensioner Card' },
+                    { id: 'social', label: 'Social Relief Document' }
+                  ].map((type) => (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={[styles.docTypeBtn, docType === type.id && styles.docTypeBtnActive]}
+                      onPress={() => setDocType(type.id as any)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.docRadioBtn, docType === type.id && styles.docRadioBtnActive]}>
+                        {docType === type.id && <View style={styles.docRadioInner} />}
+                      </View>
+                      <Text style={[styles.docTypeText, docType === type.id && styles.docTypeTextActive]}>
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Image Picker Area */}
+                <View style={styles.docImageContainer}>
+                  {docImage?.uri ? (
+                    <View style={styles.docPreviewWrapper}>
+                      <Image source={{ uri: docImage.uri }} style={styles.docPreviewImage} />
+                      <TouchableOpacity onPress={handleSelectDocImage} style={styles.docChangeBtn}>
+                        <Text style={styles.docChangeText}>Retake Photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={handleSelectDocImage} style={styles.docUploadBtn}>
+                      <Text style={styles.docUploadIcon}>📸</Text>
+                      <Text style={styles.docUploadText}>Tap to Scan Document</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Submit Action */}
+                <Button 
+                  title="UPLOAD FOR VERIFICATION" 
+                  onPress={handleUploadDocument} 
+                  loading={uploadingDoc}
+                  style={{ width: '100%', marginTop: 10 }} 
+                />
+
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* --- QR CODE WALLET MODAL --- */}
       <Modal
         visible={!!selectedQr}
@@ -386,7 +581,6 @@ const ProfileScreen = ({ navigation }: any) => {
                 </View>
                 
                 <View style={styles.qrContainer}>
-                  {/* Render the actual QR Code graphic. */}
                   {selectedQr && (
                     <QRCode
                       value={selectedQr} 
@@ -532,6 +726,27 @@ const styles = StyleSheet.create({
   roleText: { fontSize: 10, color: COLORS.textSub, fontWeight: '800', letterSpacing: 0.5 },
   rankBadge: { backgroundColor: '#FFF0F0', marginLeft: 8 },
   rankText: { fontSize: 10, color: COLORS.primary, fontWeight: '900', letterSpacing: 0.5 },
+  
+  // Custom Dynamic Badge States
+  badgeVerified: { backgroundColor: '#E8F5E9' },
+  textVerified: { color: COLORS.success },
+  badgePending: { backgroundColor: '#FFF8E1' },
+  textPending: { color: '#F59E0B' },
+  badgeUnverified: { backgroundColor: '#FEE2E2' },
+  textUnverified: { color: COLORS.danger },
+
+  // Verification Banner
+  verificationBanner: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2',
+    padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1,
+    borderColor: '#FEE2E2', ...SHADOWS.light
+  },
+  bannerIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FECACA', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  bannerIconText: { fontSize: 18, fontWeight: '900', color: COLORS.danger },
+  bannerTextContent: { flex: 1 },
+  bannerTitle: { fontSize: 13, fontWeight: '800', color: COLORS.danger, marginBottom: 2 },
+  bannerSub: { fontSize: 11, color: '#991B1B', fontWeight: '500' },
+  bannerArrow: { fontSize: 16, color: COLORS.danger, fontWeight: '900', marginLeft: 8 },
 
   // Gamification Progress Bar
   progressContainer: { marginBottom: 24, paddingHorizontal: 4 },
@@ -612,6 +827,31 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end', alignItems: 'center' 
   },
   
+  // Document Verification Modal Specific
+  verificationModalCard: {
+    width: '100%', backgroundColor: '#FFFFFF', 
+    borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+    padding: 32, alignItems: 'center', ...SHADOWS.heavy 
+  },
+  docModalSub: { fontSize: 13, color: COLORS.textSub, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+  docTypeContainer: { width: '100%', marginBottom: 24 },
+  docTypeBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#F9FAFB', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#F3F4F6' },
+  docTypeBtnActive: { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
+  docRadioBtn: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+  docRadioBtnActive: { borderColor: COLORS.primary },
+  docRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary },
+  docTypeText: { fontSize: 14, fontWeight: '600', color: COLORS.textMain },
+  docTypeTextActive: { color: COLORS.primary, fontWeight: '800' },
+  
+  docImageContainer: { width: '100%', marginBottom: 24 },
+  docUploadBtn: { width: '100%', height: 120, borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
+  docUploadIcon: { fontSize: 32, marginBottom: 8 },
+  docUploadText: { fontSize: 13, fontWeight: '700', color: COLORS.textSub },
+  docPreviewWrapper: { width: '100%', alignItems: 'center' },
+  docPreviewImage: { width: '100%', height: 160, borderRadius: 16, marginBottom: 12 },
+  docChangeBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#F3F4F6', borderRadius: 8 },
+  docChangeText: { fontSize: 12, fontWeight: '800', color: COLORS.textMain },
+
   // QR Modal Specific
   modalCard: { 
     width: '100%', backgroundColor: '#FFFFFF', 
@@ -623,11 +863,6 @@ const styles = StyleSheet.create({
   closeIconText: { fontSize: 20, color: '#A0A0A0', fontWeight: '900' },
   
   qrContainer: { padding: 24, backgroundColor: '#F8F9FA', borderRadius: 24, marginBottom: 24, width: '100%', alignItems: 'center' },
-  qrBorder: { 
-    width: 220, height: 220, borderWidth: 2, borderColor: COLORS.primary, 
-    borderStyle: 'dashed', borderRadius: 20, justifyContent: 'center', 
-    alignItems: 'center', backgroundColor: '#FFFFFF' 
-  },
   qrData: { fontSize: 24, fontWeight: '900', letterSpacing: 2, color: COLORS.textMain },
   modalInfo: { textAlign: 'center', color: COLORS.textSub, fontSize: 14, lineHeight: 22, fontWeight: '500', marginBottom: 24 },
   modalActionBtn: { width: '100%', height: 56, borderRadius: 16 },
@@ -636,8 +871,7 @@ const styles = StyleSheet.create({
   langModalCard: { 
     backgroundColor: '#FFFFFF', width: '100%',
     borderTopLeftRadius: 32, borderTopRightRadius: 32, 
-    padding: 32, alignItems: 'center', 
-    ...SHADOWS.heavy 
+    padding: 32, alignItems: 'center', ...SHADOWS.heavy 
   },
   langBtn: {
     width: '100%', padding: 20, borderRadius: 16,
@@ -657,8 +891,7 @@ const styles = StyleSheet.create({
   notifModalCard: {
     backgroundColor: '#FFFFFF', width: '100%',
     borderTopLeftRadius: 32, borderTopRightRadius: 32, 
-    padding: 32, alignItems: 'center', 
-    ...SHADOWS.heavy 
+    padding: 32, alignItems: 'center', ...SHADOWS.heavy 
   },
   notifCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

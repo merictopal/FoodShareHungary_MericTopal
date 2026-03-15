@@ -14,6 +14,8 @@ export type User = {
   email: string;
   role: 'student' | 'restaurant' | 'admin';
   status: string;
+  // NEW: Added verification_status to fix the TypeScript error
+  verification_status?: 'verified' | 'pending' | 'unverified';
 } | null;
 
 type AuthContextType = {
