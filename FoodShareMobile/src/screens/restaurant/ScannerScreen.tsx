@@ -5,6 +5,10 @@ import { useNavigation } from '@react-navigation/native';
 // Import the API service to communicate with the Python backend
 import { offersApi } from '../../api/offers';
 
+// 🚀 THE ABSOLUTE FIX: Module-level lock! 
+// This lives outside of React's lifecycle and cannot be bypassed by 60FPS camera frames.
+let isGlobalScanLocked = false;
+
 export default function ScannerScreen() {
   // State management for camera permissions, scanning status, and API loading
   const [hasPermission, setHasPermission] = useState(false);
@@ -17,6 +21,9 @@ export default function ScannerScreen() {
   const device = useCameraDevice('back');
 
   useEffect(() => {
+    // Reset the lock every time the scanner screen is opened
+    isGlobalScanLocked = false;
+    
     // Request native camera permissions on component mount
     (async () => {
       const status = await Camera.requestCameraPermission();
@@ -27,52 +34,68 @@ export default function ScannerScreen() {
   // Configure the high-performance QR code scanner
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
-    onCodeScanned: async (codes) => {
-      // Prevent multiple rapid backend requests from a single scan
-      if (isScanned || loading) return; 
+    // Use synchronous callback to lock the gate instantly
+    onCodeScanned: (codes) => {
+      // INSTANT BLOCK: If the gate is locked, reject all incoming 60FPS frames immediately
+      if (isGlobalScanLocked) return; 
 
       if (codes.length > 0 && codes[0].value) {
+        // 🔒 LOCK THE GATE! No other frame can pass this point.
+        isGlobalScanLocked = true;
+        
         setIsScanned(true);
         setLoading(true);
         
         const scannedData = codes[0].value;
         
-        try {
-          // Send the scanned unique QR code to the backend for validation
-        // Explicitly define response as 'any' to bypass strict TypeScript checks
-        const res: any = await offersApi.verifyQr(scannedData);          
-          // Display success message with gamification points earned
-          Alert.alert('Validation Successful!', `+${res.points || 10} Points added to your leaderboard!`, [
-            { 
-              text: 'OK', 
-              onPress: () => {
-                setLoading(false);
-                navigation.goBack(); 
-              }
-            }
-          ]);
-        } catch (e: any) {
-          // Handle expired, invalid, or already used QR codes
-          const errorMsg = e.response?.data?.message || 'Invalid or expired QR Code.';
-          Alert.alert('Verification Failed', errorMsg, [
-            {
-              text: 'Scan Again',
-              onPress: () => {
-                // Reset states to allow scanning another code
-                setIsScanned(false);
-                setLoading(false);
-              }
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => {
-                setLoading(false);
-                navigation.goBack();
-              }
-            }
-          ]);
-        }
+        // Execute API call asynchronously without holding up the JS thread
+        offersApi.verifyQr(scannedData)
+          .then((res: any) => {
+            // Instantly stop the loading spinner
+            setLoading(false);
+            
+            // Extract the dynamic success message (XP and Points) from the backend
+            const successMsg = res.data?.message || res.message || 'Validation Successful!';
+            
+            // Wrap the Alert in a setTimeout for native UI stability
+            setTimeout(() => {
+              Alert.alert('Success!', successMsg, [
+                { 
+                  text: 'OK', 
+                  onPress: () => {
+                    // Navigate back. The lock remains TRUE so no rogue frames can trigger anything while closing.
+                    navigation.goBack(); 
+                  }
+                }
+              ]);
+            }, 400); 
+          })
+          .catch((e: any) => {
+            // Instantly stop the loading spinner if validation fails
+            setLoading(false);
+            
+            const errorMsg = e.response?.data?.message || 'Invalid or expired QR Code.';
+            
+            setTimeout(() => {
+              Alert.alert('Verification Failed', errorMsg, [
+                {
+                  text: 'Scan Again',
+                  onPress: () => {
+                    // UNLOCK THE GATE only because the user explicitly wants to try again
+                    isGlobalScanLocked = false;
+                    setIsScanned(false);
+                  }
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => {
+                    navigation.goBack();
+                  }
+                }
+              ]);
+            }, 400);
+          });
       }
     }
   });

@@ -113,10 +113,29 @@ export const en = {
   meals_shared: 'Meals Shared',
   no_data: 'No data available yet.',
 
-  // --- IMAGE PICKER (NEW) ---
+  // --- IMAGE PICKER ---
   add_photo: '+ Add Photo',
   change_photo: 'Change Photo',
   choose_photo_method: 'Choose a method to add a photo of your meal',
   camera: 'Take Photo',
   gallery: 'Choose from Gallery',
+
+  // --- NEW: GAMIFICATION & DYNAMIC STATUS ---
+  discount_meals: 'Discount Meals',
+  total_offers: 'Total Offers',
+  pending_offers: 'Pending Offers',
+  validated_offers: 'Validated Offers',
+  status_validated: 'VALIDATED',
+  status_pending: 'PENDING',
+  status_cancelled: 'CANCELLED',
+  lvl_newbie: 'NEWBIE',
+  lvl_food_saver: 'FOOD SAVER',
+  lvl_eco_warrior: 'ECO-WARRIOR',
+  lvl_local_hero: 'LOCAL HERO',
+  lvl_legend: 'LEGEND',
+  scan_qr_btn: 'Scan QR Code',
+  admin_pending_rests: 'Pending Restaurants',
+  admin_pending_docs: 'Pending User Documents',
+  admin_no_rests: 'No pending restaurants.',
+  admin_no_docs: 'No pending user documents.',
 };

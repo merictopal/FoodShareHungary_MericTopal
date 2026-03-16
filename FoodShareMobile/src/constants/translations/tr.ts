@@ -113,10 +113,29 @@ export const tr = {
   meals_shared: 'Yemek Paylaşıldı',
   no_data: 'Henüz veri bulunmuyor.',
 
-  // --- IMAGE PICKER (NEW) ---
+  // --- IMAGE PICKER ---
   add_photo: '+ Fotoğraf Ekle',
   change_photo: 'Fotoğrafı Değiştir',
   choose_photo_method: 'Yemeğin fotoğrafını eklemek için bir yöntem seçin',
   camera: 'Kamerayı Aç',
   gallery: 'Galeriden Seç',
+
+  // --- NEW: GAMIFICATION & DYNAMIC STATUS ---
+  discount_meals: 'İndirimli Yemek',
+  total_offers: 'Toplam Teklif',
+  pending_offers: 'Bekleyen Teklifler',
+  validated_offers: 'Onaylanan Teklifler',
+  status_validated: 'ONAYLANDI',
+  status_pending: 'BEKLENİYOR',
+  status_cancelled: 'İPTAL',
+  lvl_newbie: 'ÇAYLAK',
+  lvl_food_saver: 'YEMEK KURTARICI',
+  lvl_eco_warrior: 'EKO-SAVAŞÇI',
+  lvl_local_hero: 'YEREL KAHRAMAN',
+  lvl_legend: 'EFSANE',
+  scan_qr_btn: 'QR Kod Tara',
+  admin_pending_rests: 'Onay Bekleyen Restoranlar',
+  admin_pending_docs: 'Onay Bekleyen Kullanıcı Belgeleri',
+  admin_no_rests: 'Onay bekleyen restoran yok.',
+  admin_no_docs: 'Onay bekleyen kullanıcı belgesi yok.',
 };

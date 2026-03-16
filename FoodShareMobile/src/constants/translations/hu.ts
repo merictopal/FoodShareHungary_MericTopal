@@ -113,10 +113,29 @@ export const hu = {
   meals_shared: 'Megosztott Ételek',
   no_data: 'Még nincs adat.',
 
-  // --- IMAGE PICKER (NEW) ---
+  // --- IMAGE PICKER ---
   add_photo: '+ Fénykép hozzáadása',
   change_photo: 'Fénykép cseréje',
   choose_photo_method: 'Válasszon módszert az étel fényképének hozzáadásához',
   camera: 'Kamera megnyitása',
   gallery: 'Választás galériából',
+
+  // --- NEW: GAMIFICATION & DYNAMIC STATUS ---
+  discount_meals: 'Kedvezményes Ételek',
+  total_offers: 'Összes Ajánlat',
+  pending_offers: 'Függő Ajánlatok',
+  validated_offers: 'Jóváhagyott Ajánlatok',
+  status_validated: 'JÓVÁHAGYVA',
+  status_pending: 'FOLYAMATBAN',
+  status_cancelled: 'TÖRÖLVE',
+  lvl_newbie: 'KEZDŐ',
+  lvl_food_saver: 'ÉTELMENTŐ',
+  lvl_eco_warrior: 'ÖKO-HARCOS',
+  lvl_local_hero: 'HELYI HŐS',
+  lvl_legend: 'LEGENDA',
+  scan_qr_btn: 'QR Kód Beolvasása',
+  admin_pending_rests: 'Függőben lévő éttermek',
+  admin_pending_docs: 'Függőben lévő dokumentumok',
+  admin_no_rests: 'Nincsenek függőben lévő éttermek.',
+  admin_no_docs: 'Nincsenek függőben lévő dokumentumok.',
 };
