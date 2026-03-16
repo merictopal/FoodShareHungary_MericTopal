@@ -81,6 +81,7 @@ def verify_claim():
 @main.route('/api/student/history/<int:user_id>', methods=['GET'])
 def get_student_history(user_id):
     try:
+        student = User.query.get(user_id)
         claims = Claim.query.filter_by(user_id=user_id).order_by(desc(Claim.created_at)).all()
         
         output = []
@@ -102,7 +103,12 @@ def get_student_history(user_id):
                     'image_url': real_offer.image_url
                 })
             
-        return jsonify(output)
+        # 🚀 THE FIX: Send the history AND the live gamification stats together!
+        return jsonify({
+            'history': output,
+            'xp': student.xp if student and student.xp else 0,
+            'level': student.level if student and student.level else 1
+        })
     except Exception as e:
         print(f"History Error: {e}")
         return jsonify({'error': str(e)}), 500

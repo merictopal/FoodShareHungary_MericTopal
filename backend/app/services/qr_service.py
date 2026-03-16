@@ -99,7 +99,7 @@ class QRService:
 
     @staticmethod
     def verify_claim_qr(qr_code):
-        """Validates a scanned QR code by a restaurant and awards Gamification XP points."""
+        """Validates a scanned QR code, awards Restaurant Points, and triggers Student XP/Level logic."""
         claim = Claim.query.filter_by(qr_code=qr_code).first()
         
         if not claim:
@@ -117,37 +117,69 @@ class QRService:
             if hasattr(claim, 'validated_at'):
                 claim.validated_at = datetime.utcnow()
             
-            points_to_add = 0
             offer = Offer.query.get(claim.offer_id)
+            student = User.query.get(claim.user_id)
             restaurant = None
             
+            rest_points_added = 0
+            student_xp_added = 0
+            level_up_occurred = False
+            new_level = 1
+            lb = None
+            
             if offer:
-                restaurant = RestaurantProfile.query.get(offer.restaurant_id)
-                lb = Leaderboard.query.get(offer.restaurant_id)
+                # --- 1. RESTAURANT GAMIFICATION (LEADERBOARD) ---
+                restaurant = RestaurantProfile.query.filter_by(owner_user_id=offer.restaurant.owner_user_id).first()
+                lb = Leaderboard.query.filter_by(restaurant_id=offer.restaurant_id).first()
+                
                 if not lb:
                     lb = Leaderboard(restaurant_id=offer.restaurant_id, points=0, meals_shared=0)
                     db.session.add(lb)
                 
-                points_to_add = 20 if offer.type == 'free' else 10
+                rest_points_added = 20 if offer.type == 'free' else 10
+                lb.points = (lb.points or 0) + rest_points_added
+                lb.meals_shared = (lb.meals_shared or 0) + 1
                 
-                lb.points += points_to_add
-                lb.meals_shared += 1
-            
+                # --- 2. STUDENT GAMIFICATION (XP & LEVELING) ---
+                if student:
+                    # Dynamic XP calculation for both free and discount
+                    student_xp_added = 50 if offer.type == 'free' else 25
+                    
+                    # Failsafe math
+                    current_xp = student.xp if student.xp is not None else 0
+                    current_level = student.level if student.level is not None else 1
+                    
+                    student.xp = current_xp + student_xp_added
+                    
+                    # Leveling Logic: 1 Level for every 100 XP
+                    calculated_level = (student.xp // 100) + 1
+                    
+                    if calculated_level > current_level:
+                        student.level = calculated_level
+                        level_up_occurred = True
+                        new_level = calculated_level
+
             db.session.commit()
             
-            # TRIGGER FCM: Notify the restaurant owner that the claim was successfully verified
+            # --- 3. FCM NOTIFICATIONS ---
             if restaurant:
                 owner = User.query.get(restaurant.owner_user_id)
-                student = User.query.get(claim.user_id)
                 student_name = student.name if student else "A student"
-                NotificationService.notify_restaurant_claim_verified(owner, student_name)
+                try:
+                    NotificationService.notify_restaurant_claim_verified(owner, student_name)
+                except Exception as notif_e:
+                    print(f"⚠️ Notification error, but verification succeeded: {notif_e}")
             
+            msg = f'Success! Student earned +{student_xp_added} XP. Restaurant earned +{rest_points_added} Points.'
+            if level_up_occurred:
+                msg = f'Success! Student Leveled Up to {new_level}!'
+
             return {
                 'success': True,
-                'message': f'Validation Successful! You earned +{points_to_add} Points.',
-                'points': lb.points if offer else 0,
+                'message': msg,
                 'status': 200
             }
+            
         except Exception as e:
             db.session.rollback()
-            return {'success': False, 'message': f'Verification server error: {str(e)}', 'status': 500}
+            return {'success': False, 'message': f'Gamification error: {str(e)}', 'status': 500}

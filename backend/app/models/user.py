@@ -16,6 +16,10 @@ class User(db.Model):
     verification_status = db.Column(db.String(20), default='unverified')
     id_document_url = db.Column(db.String(500), nullable=True)
     
+    # --- GAMIFICATION ENGINE ---
+    xp = db.Column(db.Integer, default=0)
+    level = db.Column(db.Integer, default=1)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # REMOVED: updated_at and verification_doc columns to perfectly match the current PostgreSQL database schema
     fcm_token = db.Column(db.String(255), nullable=True)
@@ -75,8 +79,13 @@ class RestaurantProfile(db.Model):
         return {
             'id': self.id,
             'name': self.name,
-            'description': self.description,
-            'address': self.address,
-            'profile_image_url': self.profile_image_url,
-            'location': {'latitude': self.lat, 'longitude': self.lng}
+            'email': self.email,
+            'role': self.role,
+            'status': self.verification_status,
+            'joined_at': self.created_at.strftime('%d-%m-%Y'),
+            'restaurant_name': self.restaurant_profile.name if self.restaurant_profile else None,
+            'id_document_url': self.id_document_url,
+            # 🚀 NEW: Send Gamification stats to the mobile app!
+            'xp': self.xp or 0,
+            'level': self.level or 1
         }
