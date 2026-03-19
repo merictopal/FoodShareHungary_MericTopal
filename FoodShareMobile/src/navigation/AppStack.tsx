@@ -3,8 +3,8 @@ import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 
-import HomeScreen from '../screens/student/HomeScreen';
-import ProfileScreen from '../screens/student/ProfileScreen';
+import HomeScreen from '../screens/student/home/HomeScreen';
+import ProfileScreen from '../screens/student/profile/ProfileScreen';
 import DashboardScreen from '../screens/restaurant/DashboardScreen';
 import AdminPanelScreen from '../screens/admin/AdminPanelScreen';
 // Import the newly created Scanner screen for restaurants
