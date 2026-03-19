@@ -2,12 +2,12 @@ from flask import Blueprint, request, jsonify
 from app.services.qr_service import QRService
 from app.services.notification_service import NotificationService
 
-# 🚀 FIXED: Imported Leaderboard model correctly from stats
+# FIXED: Imported Leaderboard model correctly from stats
 from app.models.stats import Leaderboard
 
 restaurant_bp = Blueprint('restaurant', __name__)
 
-@restaurant_bp.route('/create', methods=['POST'])
+@restaurant_bp.route('/offers/create', methods=['POST'])
 def create_offer():
     data = request.get_json()
     
@@ -18,7 +18,7 @@ def create_offer():
         
     result = QRService.create_offer(data)
     
-    # --- 🚀 THE FINAL PIECE OF PHASE 2 - STAGE 3 ---
+    # --- THE FINAL PIECE OF PHASE 2 - STAGE 3 ---
     # If the offer was successfully saved to the database, fire the notification!
     if result.get('success'):
         try:
@@ -31,7 +31,7 @@ def create_offer():
             
     return jsonify(result), result.get('status', 200)
 
-@restaurant_bp.route('/verify', methods=['POST'])
+@restaurant_bp.route('/claims/verify', methods=['POST'])
 def verify_claim():
     data = request.get_json()
     qr_code = data.get('qr_code')
@@ -40,6 +40,7 @@ def verify_claim():
     
     return jsonify(result), result.get('status', 200)
 
+# Maintained your original 10-limit rank logic, but formatted the JSON to match React Native exactly
 @restaurant_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
     try:
@@ -48,12 +49,17 @@ def get_leaderboard():
         
         output = []
         for index, leader in enumerate(leaders):
-            data = leader.to_dict()
-            data['rank'] = index + 1 # Dynamically assign the leaderboard rank
-            output.append(data)
+            # Formatted to perfectly match what HomeScreen.tsx expects
+            rest_name = leader.restaurant_lb.name if leader.restaurant_lb else "Unnamed"
+            output.append({
+                'restaurant': rest_name,
+                'points': leader.points,
+                'meals': leader.meals_shared,
+                'rank': index + 1 # Dynamically assign the leaderboard rank
+            })
             
         return jsonify(output), 200
     except Exception as e:
-        # 🚀 FIXED: Added error handling so the Home Screen doesn't crash if the leaderboard fails.
+        # FIXED: Added error handling so the Home Screen doesn't crash if the leaderboard fails.
         print(f"Leaderboard Error: {str(e)}")
         return jsonify([]), 200 # Return empty array instead of 500 error to save the Home Screen

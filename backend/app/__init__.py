@@ -14,25 +14,23 @@ def create_app(config_name='default'):
     db.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
     
-    # --- BLUEPRINT REGISTRATION ---
+    # --- BLUEPRINT REGISTRATION (CLEAN ARCHITECTURE) ---
     
-    # Import main from the newly renamed main_routes.py file to avoid folder name collision
-    from .main_routes import main
-    app.register_blueprint(main)
-    
-    # Register the Auth Blueprint from the routes folder 
     from .routes.auth_routes import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     
-    # --- PHASE 4: CLOUD STORAGE INTEGRATION ---
-    # Register the Upload Blueprint for AWS S3 integration
     from .routes.upload_routes import upload_bp
     app.register_blueprint(upload_bp, url_prefix='/api/upload')
 
-    # --- ADMIN PANEL INTEGRATION ---
-    # NEW: Register the Admin Blueprint so Flask can route /api/admin requests
     from .routes.admin_routes import admin_bp
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    
+    # Core Application Routes
+    from .routes.student_routes import student_bp
+    app.register_blueprint(student_bp, url_prefix='/api')
+    
+    from .routes.restaurant_routes import restaurant_bp
+    app.register_blueprint(restaurant_bp, url_prefix='/api')
     
     @app.errorhandler(404)
     def page_not_found(e):
