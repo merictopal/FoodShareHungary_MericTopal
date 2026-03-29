@@ -85,7 +85,7 @@ def upload_restaurant_profile():
     return jsonify({'success': False, 'message': upload_result.get('message')}), 500
 
 
-# --- DEPLOYMENT READY: UPLOAD USER DOCUMENT (Migrated from main_routes) ---
+# --- DEPLOYMENT READY: UPLOAD USER DOCUMENT ---
 @upload_bp.route('/user-document', methods=['POST'])
 def upload_user_document():
     if 'file' not in request.files:
@@ -116,3 +116,35 @@ def upload_user_document():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# --- NEW: UPLOAD USER PROFILE AVATAR ---
+@upload_bp.route('/user-avatar', methods=['POST'])
+def upload_user_avatar():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file part found'}), 400
+        
+    file = request.files['file']
+    user_id = request.form.get('user_id')
+    
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No selected file'}), 400
+        
+    if not user_id:
+        return jsonify({'success': False, 'message': 'User ID is required'}), 400
+
+    # Upload to AWS S3/Firebase Storage in the 'avatars' folder
+    upload_result = StorageService.upload_file(file, folder='avatars')
+    
+    if upload_result.get('success'):
+        user = User.query.get(user_id)
+        if user:
+            user.avatar_url = upload_result.get('url')
+            db.session.commit()
+            return jsonify({
+                'success': True, 
+                'message': 'Avatar uploaded successfully', 
+                'url': upload_result.get('url')
+            }), 200
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    return jsonify({'success': False, 'message': upload_result.get('message')}), 500

@@ -11,41 +11,36 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offersApi } from '../../api/offers';
+import { client } from '../../api/client';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { LeaderboardModal } from '../../components/LeaderboardModal';
 import { useNavigation } from '@react-navigation/native';
-
-// Import image picker functions
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 
-// --- MAIN COMPONENT ---
 const DashboardScreen = () => {
-  // --- CONTEXT & HOOKS ---
-  const { user, logout, t, changeLanguage, lang } = useAuth();
+  const { user, logout, t, changeLanguage, lang, updateUser } = useAuth();
   const navigation = useNavigation<any>(); 
   
-  // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState<'free' | 'discount'>('free');
   const [qrCode, setQrCode] = useState('');
   const [title, setTitle] = useState('');
   const [qty, setQty] = useState('1');
   const [discount, setDiscount] = useState('');
   
-  // New state to hold the selected photo
   const [photo, setPhoto] = useState<Asset | null>(null);
-  
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isLeaderboardVisible, setIsLeaderboardVisible] = useState(false);
 
-  // --- ACTIONS: IMAGE PICKER ---
   const handleSelectImage = () => {
     Keyboard.dismiss();
     Alert.alert(
@@ -72,15 +67,61 @@ const DashboardScreen = () => {
             });
           }
         },
-        { 
-          text: t('cancel') || "Cancel", 
-          style: "cancel" 
-        }
+        { text: t('cancel') || "Cancel", style: "cancel" }
       ]
     );
   };
 
-  // --- ACTIONS: QR VERIFICATION ---
+  const handleEditAvatar = () => {
+    Alert.alert(t('choose_avatar_method') || "Change Profile Picture", "", [
+      { 
+        text: t('camera') || "Camera", 
+        onPress: () => { 
+          launchCamera({ mediaType: 'photo', quality: 0.5 }, (res) => { 
+            if (res.assets?.length) uploadAvatar(res.assets[0]); 
+          }); 
+        } 
+      },
+      { 
+        text: t('gallery') || "Gallery", 
+        onPress: () => { 
+          launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (res) => { 
+            if (res.assets?.length) uploadAvatar(res.assets[0]); 
+          }); 
+        } 
+      },
+      { text: t('cancel') || "Cancel", style: "cancel" }
+    ]);
+  };
+
+  const uploadAvatar = async (asset: Asset) => {
+    if (!asset || !user?.id) return;
+    setUploadingAvatar(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('user_id', String(user.id));
+      formData.append('file', { 
+        uri: asset.uri, 
+        type: asset.type || 'image/jpeg', 
+        name: asset.fileName || `avatar-${user.id}.jpg` 
+      } as any);
+
+      const response = await client.post('/upload/user-avatar', formData, { 
+        headers: { 'Content-Type': 'multipart/form-data' } 
+      });
+      
+      if (response.data.success) {
+        updateUser({ ...user, avatar_url: response.data.url });
+        Alert.alert(t('success') || "Success", "Profile picture updated!");
+      }
+    } catch (error) {
+      Alert.alert(t('error') || "Error", "Failed to upload profile picture.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleVerify = async () => {
     if (!qrCode.trim()) {
       Alert.alert(t('error'), 'Invalid code.'); 
@@ -102,7 +143,6 @@ const DashboardScreen = () => {
     }
   };
 
-  // --- ACTIONS: CREATE OFFER ---
   const handleCreate = async () => {
     if (!title.trim()) {
       Alert.alert(t('error'), 'Missing information.'); 
@@ -125,26 +165,21 @@ const DashboardScreen = () => {
         discount_rate: discountValue
       };
 
-      // 1. Check if a photo was selected, and use the appropriate API method
       if (photo) {
-        // We will create this 'createWithImage' method in the next step (offers.ts)
         await offersApi.createWithImage(offerData, photo);
       } else {
-        // Fallback to the standard text-only creation if no photo is added
         await offersApi.create(offerData);
       }
       
       Alert.alert(t('success'), t('msg_offer_published'));
       
-      // 2. Reset Form fields
       setTitle(''); 
       setQty('1'); 
       setDiscount('');
       setActiveTab('free');
-      setPhoto(null); // Clear the photo preview
+      setPhoto(null); 
       
     } catch (e: any) {
-      console.error("Offer Creation Error:", e.response?.data || e.message);
       const errorMsg = e.response?.data?.message || t('error');
       Alert.alert(t('error'), errorMsg);
     } finally {
@@ -164,11 +199,27 @@ const DashboardScreen = () => {
     );
   };
 
-  const renderAvatar = () => {
+  const renderAvatar = (isModal = false) => {
     const initial = user?.name ? user.name.charAt(0).toUpperCase() : 'R';
+    const containerStyle = isModal ? styles.modalAvatarContainer : styles.headerAvatarContainer;
+    const textStyle = isModal ? styles.modalAvatarText : styles.headerAvatarText;
+    const imageStyle = isModal ? styles.modalAvatarImage : styles.headerAvatarImage;
+
     return (
-      <View style={styles.avatarContainer}>
-        <Text style={styles.avatarText}>{initial}</Text>
+      <View style={containerStyle}>
+        {uploadingAvatar ? (
+          <ActivityIndicator color="#FFFFFF" size={isModal ? "large" : "small"} />
+        ) : user?.avatar_url ? (
+          <Image source={{ uri: user.avatar_url }} style={imageStyle} />
+        ) : (
+          <Text style={textStyle}>{initial}</Text>
+        )}
+        
+        {isModal && (
+          <TouchableOpacity style={styles.editAvatarBtn} onPress={handleEditAvatar} activeOpacity={0.7}>
+            <Text style={styles.editAvatarText}>✎</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -190,7 +241,6 @@ const DashboardScreen = () => {
         keyboardShouldPersistTaps="handled"
       >
         
-        {/* --- WELCOME SECTION --- */}
         <View style={[styles.welcomeSection, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
           <View>
             <Text style={styles.welcomeSub}>{t('hello')},</Text>
@@ -206,7 +256,6 @@ const DashboardScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* --- QR VERIFICATION CARD --- */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('verify_qr')}</Text>
           <Text style={styles.cardDescription}>{t('desc_verify_qr')}</Text>
@@ -234,7 +283,6 @@ const DashboardScreen = () => {
           </View>
         </View>
 
-        {/* --- CREATE OFFER CARD --- */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('add_offer')}</Text>
           <Text style={styles.cardDescription}>{t('desc_add_offer')}</Text>
@@ -293,7 +341,6 @@ const DashboardScreen = () => {
           
           <View style={styles.publishSpacing} />
           
-          {/* --- IMAGE PICKER UI --- */}
           <View style={styles.imagePickerContainer}>
             {photo?.uri ? (
               <View style={styles.previewContainer}>
@@ -320,7 +367,6 @@ const DashboardScreen = () => {
 
       </ScrollView>
 
-      {/* --- SETTINGS & PROFILE MODAL --- */}
       <Modal
         visible={isSettingsVisible}
         transparent={true}
@@ -344,7 +390,7 @@ const DashboardScreen = () => {
                 </View>
 
                 <View style={styles.profileInfoBox}>
-                  {renderAvatar()}
+                  {renderAvatar(true)}
                   <Text style={styles.profileName}>{user?.name}</Text>
                   <Text style={styles.profileRole}>{t('role_rest')}</Text>
                 </View>
@@ -388,7 +434,6 @@ const DashboardScreen = () => {
   );
 };
 
-// --- STYLES ---
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -397,7 +442,7 @@ const styles = StyleSheet.create({
   scrollContent: { 
     padding: 24 
   },
-  avatarContainer: {
+  headerAvatarContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -406,10 +451,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...SHADOWS.light,
   },
-  avatarText: {
+  headerAvatarText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
+  },
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+  modalAvatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    ...SHADOWS.medium,
+  },
+  modalAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '900',
+  },
+  modalAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+  },
+  editAvatarBtn: {
+    position: 'absolute',
+    bottom: 0,
+    right: -4,
+    backgroundColor: '#FFFFFF',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.light,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  editAvatarText: {
+    fontSize: 14,
+    color: COLORS.primary,
   },
   welcomeSection: { 
     marginBottom: 28, 
@@ -509,8 +597,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary, 
     fontWeight: '800' 
   },
-
-  // --- IMAGE PICKER STYLES ---
   imagePickerContainer: {
     marginBottom: 20,
     alignItems: 'center',
@@ -552,8 +638,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-
-  // --- MODAL STYLES ---
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(31, 41, 51, 0.4)', 

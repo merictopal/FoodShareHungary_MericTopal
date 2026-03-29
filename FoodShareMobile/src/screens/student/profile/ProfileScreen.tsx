@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, RefreshControl, TouchableOpacity, StatusBar, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, RefreshControl, TouchableOpacity, StatusBar, Alert, ActivityIndicator, ScrollView, Image } from 'react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 
 // Context & API
@@ -50,6 +50,9 @@ const ProfileScreen = ({ navigation }: any) => {
   const [docType, setDocType] = useState<'student' | 'pensioner' | 'social'>('student');
   const [docImage, setDocImage] = useState<Asset | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  
+  // 🚀 NEW: Avatar Upload State
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   const [stats, setStats] = useState<UserStats>({ 
     totalOrders: 0, freeCount: 0, discountCount: 0, points: 0, level: 1, rank: 0, nextLevelPoints: 100 
@@ -124,6 +127,59 @@ const ProfileScreen = ({ navigation }: any) => {
     setLangModalVisible(false);
   };
 
+  // 🚀 NEW: Avatar Selection & Upload Logic
+  const handleEditProfile = () => {
+    Alert.alert(t('choose_avatar_method') || "Change Profile Picture", "", [
+      { 
+        text: t('camera') || "Camera", 
+        onPress: () => { 
+          launchCamera({ mediaType: 'photo', quality: 0.5 }, (res) => { 
+            if (res.assets?.length) uploadAvatar(res.assets[0]); 
+          }); 
+        } 
+      },
+      { 
+        text: t('gallery') || "Gallery", 
+        onPress: () => { 
+          launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (res) => { 
+            if (res.assets?.length) uploadAvatar(res.assets[0]); 
+          }); 
+        } 
+      },
+      { text: t('cancel') || "Cancel", style: "cancel" }
+    ]);
+  };
+
+  const uploadAvatar = async (asset: Asset) => {
+    if (!asset || !user?.id) return;
+    setUploadingAvatar(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('user_id', String(user.id));
+      formData.append('file', { 
+        uri: asset.uri, 
+        type: asset.type || 'image/jpeg', 
+        name: asset.fileName || `avatar-${user.id}.jpg` 
+      } as any);
+
+      // Call our brand new backend API route
+      const response = await client.post('/upload/user-avatar', formData, { 
+        headers: { 'Content-Type': 'multipart/form-data' } 
+      });
+      
+      // Update global AuthContext with the new avatar URL so it shows instantly
+      if (response.data.success) {
+        updateUser({ ...user, avatar_url: response.data.url });
+        Alert.alert(t('success') || "Success", "Profile picture updated!");
+      }
+    } catch (error) {
+      Alert.alert(t('error') || "Error", "Failed to upload profile picture.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSelectDocImage = () => {
     Alert.alert(t('choose_photo_method') || "Upload Document", "", [
       { text: t('camera') || "Camera", onPress: () => { launchCamera({ mediaType: 'photo', quality: 0.8 }, (res) => { if (res.assets?.length) setDocImage(res.assets[0]); }); } },
@@ -169,8 +225,25 @@ const ProfileScreen = ({ navigation }: any) => {
       <View style={styles.headerWrapper}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-             <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
+             {/* 🚀 NEW: Render loading spinner, actual image, or fallback initial */}
+             {uploadingAvatar ? (
+               <ActivityIndicator color="#FFFFFF" size="large" />
+             ) : user?.avatar_url ? (
+               <Image source={{ uri: user.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 22 }} />
+             ) : (
+               <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
+             )}
+             
+             {/* 🚀 FIXED: We finally activated the pencil icon! */}
+             <TouchableOpacity 
+               style={styles.editIconBtn} 
+               onPress={handleEditProfile} 
+               activeOpacity={0.7}
+             >
+               <Text style={styles.editIconText}>✎</Text>
+             </TouchableOpacity>
           </View>
+          
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user?.name}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>

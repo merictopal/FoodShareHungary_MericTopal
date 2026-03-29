@@ -7,7 +7,6 @@ import HomeScreen from '../screens/student/home/HomeScreen';
 import ProfileScreen from '../screens/student/profile/ProfileScreen';
 import DashboardScreen from '../screens/restaurant/DashboardScreen';
 import AdminPanelScreen from '../screens/admin/AdminPanelScreen';
-// Import the newly created Scanner screen for restaurants
 import ScannerScreen from '../screens/restaurant/ScannerScreen';
 
 const Stack = createNativeStackNavigator();
@@ -28,8 +27,8 @@ export const AppStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       
-      {/* Student Routes */}
-      {user?.role === 'student' && (
+      {/* 🚀 FIXED: User (formerly Student) Routes - Accepts both for backward compatibility */}
+      {(user?.role === 'user' || user?.role === 'student') && (
         <>
           <Stack.Screen name="StudentHome" component={HomeScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -40,7 +39,6 @@ export const AppStack = () => {
       {user?.role === 'restaurant' && (
         <>
           <Stack.Screen name="RestaurantDashboard" component={DashboardScreen} />
-          {/* Add ScannerScreen specifically for restaurant users */}
           <Stack.Screen name="Scanner" component={ScannerScreen} />
         </>
       )}
@@ -50,8 +48,8 @@ export const AppStack = () => {
         <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
       )}
 
-      {/* Fallback Error Route */}
-      {!['student', 'restaurant', 'admin'].includes(user?.role || '') && (
+      {/* 🚀 FIXED: Fallback Error Route now recognizes 'user' */}
+      {!['user', 'student', 'restaurant', 'admin'].includes(user?.role || '') && (
         <Stack.Screen name="Error" component={ErrorScreen} />
       )}
 
