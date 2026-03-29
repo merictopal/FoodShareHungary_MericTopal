@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, ScrollView 
+  KeyboardAvoidingView, Platform, ScrollView, Alert 
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SHADOWS } from '../../constants/theme';
@@ -11,24 +11,71 @@ import { Header } from '../../components/Header';
 
 const RegisterScreen = ({ navigation }: any) => {
   // --- HOOKS & CONTEXT ---
-  const { register, isLoading, t } = useAuth();
+  // 🚀 NEW: We brought in the 'login' function to achieve Auto-Login!
+  const { register, login, isLoading, t } = useAuth();
   
   // --- STATE MANAGEMENT ---
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'restaurant'>('student');
+  
+  // 🚀 NEW: Phone and Address fields
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  
+  // 🚀 FIXED: UI says 'student' or 'restaurant', but we map 'student' -> 'user' in backend
+  const [displayRole, setDisplayRole] = useState<'student' | 'restaurant'>('student');
 
   // --- ACTIONS ---
+  const validateEmail = (emailStr: string) => {
+    // Standard Regex to check if email contains @ and .
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(emailStr);
+  };
+
   const handleRegister = async () => {
-    // Prevent empty submissions
-    if (!name || !email || !password) return;
+    // 1. Prevent empty core submissions
+    if (!name || !email || !password) {
+      Alert.alert(t('error') || "Error", t('fill_all_fields') || "Please fill in all required fields.");
+      return;
+    }
+
+    // 2. Strong Email Validation
+    if (!validateEmail(email)) {
+      Alert.alert(t('error') || "Error", t('invalid_email') || "Please enter a valid email address.");
+      return;
+    }
+
+    // 3. Prevent empty address for restaurants
+    if (displayRole === 'restaurant' && !address) {
+      Alert.alert(t('error') || "Error", "Restaurant address is required.");
+      return;
+    }
 
     try {
-      await register({ name, email, password, role });
-      navigation.navigate('Login');
-    } catch (e) {
-      // Error handled by AuthContext
+      // 🚀 FIXED: Map 'student' UI selection to 'user' database role
+      const backendRole = displayRole === 'student' ? 'user' : 'restaurant';
+      
+      // Send the new data to backend
+      await register({ 
+        name, 
+        email, 
+        password, 
+        role: backendRole,
+        phone,
+        address: displayRole === 'restaurant' ? address : undefined
+      });
+      
+      // 🚀 THE MAGIC: Auto-Login after successful registration! (Frictionless UX)
+      await login(email, password);
+      
+      // Note: We don't need to navigation.navigate('Home') because AuthContext 
+      // automatically switches the Stack to MainStack when a user is detected!
+
+    } catch (e: any) {
+      // If error is not handled completely inside AuthContext, show it here
+      const msg = e.response?.data?.message || "Registration failed. Please try again.";
+      Alert.alert(t('error') || "Error", msg);
     }
   };
 
@@ -46,23 +93,23 @@ const RegisterScreen = ({ navigation }: any) => {
       >
         <Text style={styles.sub}>{t('register_sub')}</Text>
 
-        {/* --- ROLE SELECTOR (Gamified/Premium feel without emojis) --- */}
+        {/* --- ROLE SELECTOR --- */}
         <View style={styles.roleSelector}>
           <TouchableOpacity 
-            style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]} 
-            onPress={() => setRole('student')}
+            style={[styles.roleBtn, displayRole === 'student' && styles.roleBtnActive]} 
+            onPress={() => setDisplayRole('student')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.roleText, role === 'student' && styles.roleTextActive]}>
+            <Text style={[styles.roleText, displayRole === 'student' && styles.roleTextActive]}>
               {t('role_student')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.roleBtn, role === 'restaurant' && styles.roleBtnActive]} 
-            onPress={() => setRole('restaurant')}
+            style={[styles.roleBtn, displayRole === 'restaurant' && styles.roleBtnActive]} 
+            onPress={() => setDisplayRole('restaurant')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.roleText, role === 'restaurant' && styles.roleTextActive]}>
+            <Text style={[styles.roleText, displayRole === 'restaurant' && styles.roleTextActive]}>
               {t('role_rest')}
             </Text>
           </TouchableOpacity>
@@ -71,11 +118,9 @@ const RegisterScreen = ({ navigation }: any) => {
         {/* --- REGISTRATION FORM --- */}
         <View style={styles.form}>
           
-          {/* Dynamically switching label and placeholder based on selected role.
-              Also removed emojis (🎓, 🍳) to maintain a sleek, clean UI. */}
           <Input 
-            label={role === 'student' ? t('name_student_ph') : t('name_rest_ph')}
-            placeholder={role === 'student' ? t('ph_name_student') : t('ph_offer_name')} 
+            label={displayRole === 'student' ? t('name_student_ph') : t('name_rest_ph')}
+            placeholder={displayRole === 'student' ? t('ph_name_student') : t('ph_offer_name')} 
             value={name} 
             onChangeText={setName} 
             autoCapitalize="words"
@@ -89,6 +134,26 @@ const RegisterScreen = ({ navigation }: any) => {
             keyboardType="email-address" 
             autoCapitalize="none"
           />
+
+          {/* 🚀 NEW: Phone Number (For both User and Restaurant) */}
+          <Input 
+            label={t('phone_ph') || "Phone Number"} 
+            placeholder="+36 30 123 4567" 
+            value={phone} 
+            onChangeText={setPhone} 
+            keyboardType="phone-pad" 
+          />
+
+          {/* 🚀 NEW: Address (Only visible if Restaurant is selected) */}
+          {displayRole === 'restaurant' && (
+             <Input 
+               label={t('address_ph') || "Restaurant Address"} 
+               placeholder="1051 Budapest, Szent István tér" 
+               value={address} 
+               onChangeText={setAddress} 
+               autoCapitalize="words"
+             />
+          )}
           
           <Input 
             label={t('pass_ph')} 
@@ -120,7 +185,8 @@ const styles = StyleSheet.create({
   },
   content: { 
     padding: 24,
-    paddingTop: 10 // Adjusted to pull content slightly closer to the header
+    paddingTop: 10,
+    paddingBottom: 40 // Added padding bottom so the scrollview doesn't hide the button under keyboard
   },
   sub: { 
     fontSize: 15, 
@@ -133,7 +199,7 @@ const styles = StyleSheet.create({
   // Role Selector Styles
   roleSelector: { 
     flexDirection: 'row', 
-    backgroundColor: '#EAECEF', // Soft neutral background for the selector
+    backgroundColor: '#EAECEF', 
     borderRadius: 14, 
     padding: 4, 
     marginBottom: 30 
@@ -146,7 +212,7 @@ const styles = StyleSheet.create({
   },
   roleBtnActive: { 
     backgroundColor: COLORS.surface, 
-    ...SHADOWS.light // Using our newly defined premium shadow
+    ...SHADOWS.light 
   },
   roleText: { 
     fontWeight: '700', 

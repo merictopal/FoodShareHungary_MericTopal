@@ -27,12 +27,10 @@ class Leaderboard(db.Model):
     __tablename__ = 'leaderboard'
     __table_args__ = {'extend_existing': True}
 
-    # 🚀 Veritabanına birebir uyarlandı!
     id = db.Column(db.Integer, primary_key=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant_profiles.id'), nullable=False)
     points = db.Column(db.Integer, default=0)
     meals_shared = db.Column(db.Integer, default=0)
-    # last_updated sütunu veritabanında olmadığı için silindi!
 
     def to_dict(self):
         return {

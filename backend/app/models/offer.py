@@ -48,7 +48,6 @@ class Claim(db.Model):
     qr_code = db.Column(db.String(255), unique=True, nullable=False)
     status = db.Column(db.String(20), default='pending')
     
-    # 🚀 Veritabanına uyarlandı: 'timestamp' yerine 'created_at' oldu, validated_at silindi.
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
