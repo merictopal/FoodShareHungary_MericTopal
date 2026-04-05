@@ -93,6 +93,7 @@ def upload_user_document():
         
     file = request.files['file']
     user_id = request.form.get('user_id')
+    doc_type = request.form.get('document_type', 'unknown')
 
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -109,6 +110,7 @@ def upload_user_document():
 
         user.verification_status = 'pending'
         user.id_document_url = upload_result.get('url')
+        user.document_type = doc_type
         db.session.commit()
 
         return jsonify({'message': 'Document uploaded successfully', 'file_url': user.id_document_url}), 200

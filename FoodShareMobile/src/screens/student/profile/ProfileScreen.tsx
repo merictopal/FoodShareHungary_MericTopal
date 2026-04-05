@@ -74,6 +74,11 @@ const ProfileScreen = ({ navigation }: any) => {
   const fetchHistory = async () => {
     if (!user?.id) return;
     try {
+      const userRes = await client.get(`/auth/me/${user.id}`); 
+      if (userRes.data && userRes.data.user) {
+        // Sync AuthContext with the latest database status
+        updateUser(userRes.data.user);
+      }
       const res = await offersApi.getHistory(user.id);
       const data: HistoryItem[] = Array.isArray(res.data) ? res.data : (res.data.history || []);
       setHistory(data);
