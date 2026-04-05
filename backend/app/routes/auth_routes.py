@@ -34,3 +34,26 @@ def update_fcm_token():
     data = request.get_json()
     result = AuthService.update_fcm_token(data)
     return jsonify(result), result['status']
+# --- GET CURRENT USER DATA ---
+@auth_bp.route('/me/<int:user_id>', methods=['GET'])
+def get_current_user(user_id):
+    """Fetches the latest user data to sync mobile app state."""
+    from app.models.user import User # Import here to avoid circular dependencies if needed
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+
+    return jsonify({
+        'success': True,
+        'user': {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'role': user.role,
+            'verification_status': user.verification_status,
+            'avatar_url': getattr(user, 'avatar_url', None),
+            'xp': getattr(user, 'xp', 0),
+            'level': getattr(user, 'level', 1)
+        }
+    }), 200

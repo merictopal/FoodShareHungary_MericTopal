@@ -1,0 +1,9 @@
+/* Import Tailwind base styles and utilities */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Set a standard background for our admin panel */
+body {
+  background-color: #F3F4F6;
+}
