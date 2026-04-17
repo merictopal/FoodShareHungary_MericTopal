@@ -35,6 +35,7 @@ type AuthContextType = {
 const STORAGE_KEYS = {
   USER: '@FoodShare_User',
   TOKEN: '@FoodShare_Token',
+  REFRESH_TOKEN: '@FoodShare_RefreshToken', 
   LANG: '@FoodShare_Lang',
 };
 
@@ -121,9 +122,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(res.user);
         await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
         
+        // 🚀 YENİ: Artık backend 2 bilet gönderiyor, ikisini de güvenle kaydediyoruz!
         if (res.token) {
           await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
         }
+        if (res.refresh_token) {
+          await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refresh_token);
+        }
+
       } else {
         throw new Error(res.message);
       }
@@ -156,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-// --- 6. LOGOUT OPERATION ---
+  // --- 6. LOGOUT OPERATION ---
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -164,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Clear session info from device but keep language preference
       await AsyncStorage.removeItem(STORAGE_KEYS.USER);
       await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN); // 🚀 YENİ: Çıkış yaparken Refresh Token'ı da siliyoruz
     } catch (error) {
       console.error("Error occurred during logout:", error);
     } finally {
@@ -171,7 +178,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-// --- 7. NEW: SYNC FCM TOKEN WITH BACKEND (WITH DEBUG LOGS) ---
+  // --- 7. NEW: SYNC FCM TOKEN WITH BACKEND (WITH DEBUG LOGS) ---
   useEffect(() => {
     console.log("🔄 [DEBUG] AuthContext useEffect triggered! User state is:", user);
     

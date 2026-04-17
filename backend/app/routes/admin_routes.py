@@ -1,16 +1,18 @@
 from flask import Blueprint, request, jsonify
 from app.models import User, RestaurantProfile, Offer, Claim
 from app.extensions import db
-from sqlalchemy import func # 🚀 FIXED: Moved to the top globally
+from app.models.user import AuditLog
+from sqlalchemy import func 
+from app.utils.decorators import admin_required # 🚀 THE FIX: Imported the Security Shield
 
 admin_bp = Blueprint('admin', __name__)
 
 # --- GET SYSTEM STATISTICS ---
 @admin_bp.route('/stats', methods=['GET'])
+@admin_required # 🛡️ Shield applied
 def get_stats():
     """Returns basic counts formatted specifically for the React admin dashboard."""
     try:
-        # Standardize individual users by checking both 'user' and legacy 'student' roles
         total_users = User.query.filter(User.role.in_(['user', 'student'])).count()
         total_restaurants = User.query.filter_by(role='restaurant').count()
         active_offers = Offer.query.filter_by(status='active').count()
@@ -30,6 +32,7 @@ def get_stats():
 
 # --- GET PENDING VERIFICATIONS ---
 @admin_bp.route('/pending', methods=['GET'])
+@admin_required # 🛡️ Shield applied
 def get_pending_users():
     """Fetches all users and restaurants waiting for admin approval."""
     try:
@@ -69,6 +72,7 @@ def get_pending_users():
 
 # --- APPROVE USER ---
 @admin_bp.route('/approve', methods=['POST'])
+@admin_required # 🛡️ Shield applied
 def approve_user():
     """Changes a user's status from pending to verified."""
     data = request.get_json()
@@ -88,6 +92,7 @@ def approve_user():
 
 # --- REJECT USER ---
 @admin_bp.route('/reject', methods=['POST'])
+@admin_required # 🛡️ Shield applied
 def reject_user():
     """Rejects a user document, setting them back to unverified so they can try again."""
     data = request.get_json()
@@ -99,7 +104,6 @@ def reject_user():
         
     try:
         user.verification_status = 'unverified'
-        # Clear the document URL so they can upload a new one
         user.id_document_url = None
         db.session.commit()
         return jsonify({"success": True, "message": f"{user.name}'s document has been rejected."}), 200
@@ -109,6 +113,7 @@ def reject_user():
     
 # --- GET ALL USERS ---
 @admin_bp.route('/users', methods=['GET'])
+@admin_required # 🛡️ Shield applied
 def get_all_users():
     """Fetches all registered users for the admin management table."""
     try:
@@ -131,6 +136,7 @@ def get_all_users():
     
 # --- SUSPEND (BAN) USER ---
 @admin_bp.route('/suspend', methods=['POST'])
+@admin_required # 🛡️ Shield applied
 def suspend_user():
     """Changes a user's verification status to suspended."""
     data = request.get_json()
@@ -150,6 +156,7 @@ def suspend_user():
 
 # --- GET DETAILED USER STATS ---
 @admin_bp.route('/user/<int:user_id>/stats', methods=['GET'])
+@admin_required # 🛡️ Shield applied
 def get_user_detailed_stats(user_id):
     """Fetches detailed statistics safely for both users and restaurants."""
     user = User.query.get(user_id)
@@ -158,8 +165,6 @@ def get_user_detailed_stats(user_id):
 
     try:
         role = str(user.role).strip().lower()
-        
-        # Base statistics dictionary
         stats = {
             "name": user.name,
             "role": role,
@@ -172,7 +177,6 @@ def get_user_detailed_stats(user_id):
             "total_portions": 0
         }
 
-        # --- SAFELY FETCH ROLE-SPECIFIC DATA ---
         if role in ['user', 'student']:
             stats["meals_claimed"] = Claim.query.filter_by(user_id=user.id).count()
             
@@ -182,17 +186,13 @@ def get_user_detailed_stats(user_id):
             if profile and hasattr(profile, 'name'):
                 stats["name"] = profile.name
 
-            # 🚀 THE FIX: Use RestaurantProfile.id instead of User.id if applicable
             search_kwargs = {}
             if hasattr(Offer, 'restaurant_id') and profile and hasattr(profile, 'id'):
                 search_kwargs = {'restaurant_id': profile.id}
             else:
                 search_kwargs = {'user_id': user.id}
             
-            # 1. Total number of active/past offers published
             stats["offers_created"] = Offer.query.filter_by(**search_kwargs).count()
-            
-            # 2. Total sum of portions (quantity) they shared
             portions = db.session.query(func.sum(Offer.quantity)).filter_by(**search_kwargs).scalar()
             stats["total_portions"] = int(portions) if portions else 0
 
@@ -202,21 +202,18 @@ def get_user_detailed_stats(user_id):
         print(f"Stats fetch error for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Server Error: {str(e)}"}), 500
     
-    # --- GET ALL OFFERS ---
+# --- GET ALL OFFERS ---
 @admin_bp.route('/offers', methods=['GET'])
+@admin_required # 🛡️ Shield applied
 def get_all_offers():
     """Fetches all food offers for the admin dashboard."""
     try:
-        # Fetch offers and sort by newest first
         offers = Offer.query.order_by(Offer.created_at.desc()).all()
         output = []
         
         for offer in offers:
             try:
-                # Find the restaurant name associated with this offer
                 rest_name = "Unknown Restaurant"
-                
-                # Check based on your database structure (restaurant_id vs user_id)
                 if hasattr(offer, 'restaurant_id') and offer.restaurant_id:
                     profile = RestaurantProfile.query.get(offer.restaurant_id)
                     if profile:
@@ -244,6 +241,7 @@ def get_all_offers():
 
 # --- CANCEL/DELETE OFFER ---
 @admin_bp.route('/offer/cancel', methods=['POST'])
+@admin_required # 🛡️ Shield applied
 def cancel_offer():
     """Allows admin to cancel or take down an active offer."""
     data = request.get_json()
@@ -254,10 +252,27 @@ def cancel_offer():
         return jsonify({"success": False, "message": "Offer not found."}), 404
         
     try:
-        # Instead of deleting from DB, we change status to 'cancelled' for history tracking
         offer.status = 'cancelled'
         db.session.commit()
         return jsonify({"success": True, "message": "Offer has been successfully cancelled."}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
+    
+@admin_bp.route('/audit-logs', methods=['GET'])
+@admin_required # 🛡️ Shield applied (This was the main fix)
+def get_audit_logs():
+    """Fetches all security events from the database, ordered by latest first."""
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(200).all()
+    
+    return jsonify({
+        "success": True,
+        "logs": [{
+            "id": log.id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "details": log.details,
+            "ip_address": log.ip_address,
+            "timestamp": log.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        } for log in logs]
+    }), 200

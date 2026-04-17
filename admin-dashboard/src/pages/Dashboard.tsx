@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Store, UtensilsCrossed, 
-  LogOut, FileText, CheckCircle, XCircle, Eye 
+  LogOut, FileText, CheckCircle, XCircle, Eye, ShieldAlert
 } from 'lucide-react';
 import { client } from '../api/client';
 import { 
@@ -139,6 +139,12 @@ export default function Dashboard() {
           <Link to="/offers" className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition-colors">
             <UtensilsCrossed className="w-5 h-5" />
             <span className="font-medium">Active Offers</span>
+          </Link>
+
+          {/* new */ }
+          <Link to="/audit-logs" className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition-colors">
+            <ShieldAlert className="w-5 h-5" />
+            <span className="font-medium">Security Logs</span>
           </Link>
         </nav>
 

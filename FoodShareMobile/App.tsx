@@ -8,9 +8,6 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 
-// IMPORT NEW API SERVICE TO SEND TOKEN TO BACKEND
-import { authApi } from './src/api/auth';
-
 const App = () => {
   
   useEffect(() => {
@@ -31,39 +28,29 @@ const App = () => {
         }
       }
 
-      // 2. Get the unique device token for Push Notifications
+      // 2. We only request permission and log the token here.
+      // We DO NOT send it to backend here because the user might not be logged in yet.
+      // The actual sending to backend is securely handled inside AuthContext.tsx when a user logs in.
       try {
         console.log('Requesting Firebase token from Google servers...');
         const token = await messaging().getToken();
-        
-        // Log the token silently to the terminal for debugging purposes
         console.log('🔥 FIREBASE FCM TOKEN:', token);
-        
-        // 3. SEND TOKEN TO BACKEND
-        try {
-          await authApi.updateFcmToken(token);
-          console.log('✅ Token successfully sent to backend!');
-        } catch (apiErr) {
-          console.error('❌ Failed to send token to backend:', apiErr);
-        }
-        
+        // Removed authApi.updateFcmToken() from here to prevent the "No token available" crash on startup.
       } catch (error: any) {
         console.error('Error fetching FCM token:', error);
       }
     };
 
     // FIX: Delay the permission request slightly to ensure the Android Activity is fully attached to the view.
-    // 1000ms (1 second) is usually enough for React Native to finish rendering the initial layout.
     const permissionTimeout = setTimeout(() => {
       requestNotificationPermission();
     }, 1000);
 
-    // 4. Listen for real-time messages when the app is in the foreground
+    // 3. Listen for real-time messages when the app is in the foreground
     const unsubscribe = messaging().onMessage(async remoteMessage => {
       const title = remoteMessage.notification?.title || 'New Alert! 🔔';
       const body = remoteMessage.notification?.body || 'Check out the new offers.';
       
-      // Keep showing alerts only for incoming real-time messages
       Alert.alert(title, body);
     });
 

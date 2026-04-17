@@ -10,6 +10,12 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'cok-gizli-anahtar'
+    
+    # --- JWT SECURITY CONFIGURATION ---
+    # Used specifically to sign the JWT tokens securely. 
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'super-secure-jwt-offline-key-2026-production'
+    JWT_EXPIRATION_HOURS = 24
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     @staticmethod
