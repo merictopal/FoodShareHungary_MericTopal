@@ -11,16 +11,17 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False, index=True)
     
-    # NEW: Added phone number for security and communication
+    # Added phone number for security and communication
     phone = db.Column(db.String(20), nullable=True) 
+    
+    # Security: Stores hashed passwords, never plain text
     password_hash = db.Column(db.String(255), nullable=False)
     
-    # FIXED: Changed default role from 'student' to 'user' for a broader audience
+    # Role-Based Access Control (RBAC) definitions
     role = db.Column(db.String(20), default='user', nullable=False)
     verification_status = db.Column(db.String(20), default='unverified')
     
     id_document_url = db.Column(db.String(500), nullable=True)
-    # NEW: Added avatar URL for user profile pictures
     avatar_url = db.Column(db.String(500), nullable=True) 
     
     # --- GAMIFICATION ENGINE ---
@@ -28,6 +29,7 @@ class User(db.Model):
     level = db.Column(db.Integer, default=1)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
     fcm_token = db.Column(db.String(255), nullable=True)
     
     # Clean, single-source-of-truth relationships with fully qualified paths
@@ -37,13 +39,16 @@ class User(db.Model):
 
     @property
     def password(self):
+        """Prevents password from being accessed directly."""
         raise AttributeError('Password is not a readable attribute! Use hash.')
 
     @password.setter
     def password(self, password):
+        """Hashes the password securely before storing it in the database."""
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        """Verifies if the provided password matches the stored hash."""
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
@@ -58,7 +63,6 @@ class User(db.Model):
             'restaurant_name': self.restaurant_profile.name if self.restaurant_profile else None,
             'id_document_url': self.id_document_url,
             'avatar_url': self.avatar_url,
-            # FIXED: Moved Gamification stats to the User dictionary where they belong
             'xp': self.xp or 0,
             'level': self.level or 1
         }
@@ -77,7 +81,6 @@ class RestaurantProfile(db.Model):
     name = db.Column(db.String(120), nullable=False) 
     description = db.Column(db.Text, nullable=True)
     
-    # These were actually already in your code, but now we will actively use them!
     address = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
     profile_image_url = db.Column(db.String(500), nullable=True)
@@ -91,7 +94,6 @@ class RestaurantProfile(db.Model):
     leaderboard_entry = db.relationship('app.models.stats.Leaderboard', backref='restaurant_lb', uselist=False)
 
     def to_dict(self):
-        # CRITICAL FIX: Removed User fields from this method and correctly mapped Restaurant fields.
         return {
             'id': self.id,
             'owner_id': self.owner_user_id,
@@ -103,3 +105,18 @@ class RestaurantProfile(db.Model):
             'lat': self.lat,
             'lng': self.lng
         }
+    
+# --- AUDIT LOG (ENTERPRISE SECURITY) ---
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True) # Nullable for failed logins
+    action = db.Column(db.String(100), nullable=False) # e.g., 'LOGIN_SUCCESS', 'PROFILE_UPDATE'
+    details = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(50), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<AuditLog {self.action} by User {self.user_id}>"
