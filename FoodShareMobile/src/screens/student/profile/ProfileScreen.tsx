@@ -71,15 +71,23 @@ const ProfileScreen = ({ navigation }: any) => {
     return t('lvl_newbie');
   };
 
+  // --- FETCH HISTORY (WITH DETAILED DEBUGGING) ---
   const fetchHistory = async () => {
     if (!user?.id) return;
+    
     try {
+      // 1. Fetching user details
+      console.log(`🔄 [DEBUG] Fetching user details for ID: ${user.id}...`);
       const userRes = await client.get(`/auth/me/${user.id}`); 
+      
       if (userRes.data && userRes.data.user) {
-        // Sync AuthContext with the latest database status
         updateUser(userRes.data.user);
       }
+      
+      // 2. Fetching user history
+      console.log(`🔄 [DEBUG] Fetching history for ID: ${user.id}...`);
       const res = await offersApi.getHistory(user.id);
+      
       const data: HistoryItem[] = Array.isArray(res.data) ? res.data : (res.data.history || []);
       setHistory(data);
       
@@ -98,8 +106,25 @@ const ProfileScreen = ({ navigation }: any) => {
         rank: liveXp > 0 ? Math.max(1, 500 - Math.floor(liveXp / 10)) : 0,
         nextLevelPoints: liveLevel * 100
       });
-    } catch (error) {
-      console.error("Error fetching profile history:", error);
+      
+      console.log(`✅ [DEBUG] Profile data fetched successfully!`);
+
+    } catch (error: any) {
+      // --- REAL ERROR LOGGING (NO MOCKS) ---
+      console.log("❌ [DEBUG] PROFILE FETCH FAILED!");
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code outside the 2xx range
+        console.log("🚨 Status Code:", error.response.status);
+        console.log("🚨 Backend Response:", JSON.stringify(error.response.data, null, 2));
+        console.log("🚨 Failed Endpoint:", error.config?.url);
+      } else if (error.request) {
+        // The request was made but no response was received (Network error, CORS, Server down)
+        console.log("🚨 No response received from backend. Is the server running and accessible?");
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.log("🚨 Axios Error Message:", error.message);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -221,7 +246,7 @@ const ProfileScreen = ({ navigation }: any) => {
     } else Alert.alert(t(item).toUpperCase(), "This feature will be available soon!");
   };
 
-  const renderHeader = () => {
+const renderHeader = () => {
     const isVerified = user?.verification_status === 'verified';
     const isPending = user?.verification_status === 'pending';
     const progressPercentage = stats.points > 0 ? Math.min((stats.points / stats.nextLevelPoints) * 100, 100) : 0;
@@ -230,7 +255,6 @@ const ProfileScreen = ({ navigation }: any) => {
       <View style={styles.headerWrapper}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-             {/* 🚀 NEW: Render loading spinner, actual image, or fallback initial */}
              {uploadingAvatar ? (
                <ActivityIndicator color="#FFFFFF" size="large" />
              ) : user?.avatar_url ? (
@@ -239,7 +263,6 @@ const ProfileScreen = ({ navigation }: any) => {
                <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
              )}
              
-             {/* 🚀 FIXED: We finally activated the pencil icon! */}
              <TouchableOpacity 
                style={styles.editIconBtn} 
                onPress={handleEditProfile} 
@@ -288,14 +311,49 @@ const ProfileScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         )}
 
+        {/* 🚀 FIXED: XP and Progress Bar are now Gold/Amber instead of Red for positive reinforcement */}
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
             <Text style={styles.levelText}>LEVEL {stats.level} • {getLevelTitle(stats.level)}</Text>
-            <Text style={styles.pointsText}>{stats.points} / {stats.nextLevelPoints} XP</Text>
+            <Text style={[styles.pointsText, { color: '#F59E0B' }]}>{stats.points} / {stats.nextLevelPoints} XP</Text>
           </View>
           <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progressPercentage}%` }]} />
+            <View style={[styles.progressBarFill, { width: `${progressPercentage}%`, backgroundColor: '#F59E0B' }]} />
           </View>
+        </View>
+
+        {/* 🚀 NEW: Gamification Badges Section */}
+        <View style={{ marginTop: 10, marginBottom: 20 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {t('my_badges') || "My Badges"}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 20 }}>
+             
+             {/* Verified Badge */}
+             <View style={{ alignItems: 'center', opacity: isVerified ? 1 : 0.4 }}>
+               <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#10B981', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                 <Text style={{ fontSize: 20 }}>🛡️</Text>
+               </View>
+               <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSub }}>Verified</Text>
+             </View>
+
+             {/* First Rescue Badge */}
+             <View style={{ alignItems: 'center', opacity: stats.totalOrders > 0 ? 1 : 0.4 }}>
+               <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                 <Text style={{ fontSize: 20 }}>🌱</Text>
+               </View>
+               <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSub }}>1st Rescue</Text>
+             </View>
+
+             {/* Level 3 Badge (Locked/Unlocked) */}
+             <View style={{ alignItems: 'center', opacity: stats.level >= 3 ? 1 : 0.4 }}>
+               <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#F59E0B', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                 <Text style={{ fontSize: 20 }}>⭐</Text>
+               </View>
+               <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSub }}>Lv 3 Saver</Text>
+             </View>
+             
+          </ScrollView>
         </View>
 
         <View style={styles.statsCard}>
@@ -303,16 +361,23 @@ const ProfileScreen = ({ navigation }: any) => {
           <View style={styles.statsGrid}>
             <View style={styles.statItem}><Text style={styles.statValue}>{stats.totalOrders}</Text><Text style={styles.statLabel}>{t('orders')}</Text></View>
             <View style={styles.verticalLine} />
-            <View style={styles.statItem}><Text style={[styles.statValue, { color: COLORS.primary }]}>{stats.points}</Text><Text style={styles.statLabel}>TOTAL XP</Text></View>
+            <View style={styles.statItem}><Text style={[styles.statValue, { color: '#F59E0B' }]}>{stats.points}</Text><Text style={styles.statLabel}>TOTAL XP</Text></View>
             <View style={styles.verticalLine} />
             <View style={styles.statItem}><Text style={[styles.statValue, { color: COLORS.success }]}>{stats.freeCount}</Text><Text style={styles.statLabel}>{t('free_meals')}</Text></View>
           </View>
         </View>
 
+        {/* 🚀 FIXED: Improved Contrast for Free/Discount Blocks */}
         <View style={styles.detailedStatsWrapper}>
           <View style={styles.detailedStatsContainer}>
-            <View style={[styles.detailedStatHalf, { backgroundColor: '#2ECC71' }]}><Text style={styles.detailedStatTitle}>{t('free_meals').toUpperCase()}</Text><Text style={styles.detailedStatValue}>{stats.freeCount}</Text></View>
-            <View style={[styles.detailedStatHalf, { backgroundColor: '#F39C12' }]}><Text style={styles.detailedStatTitle}>{t('discount_meals').toUpperCase()}</Text><Text style={styles.detailedStatValue}>{stats.discountCount}</Text></View>
+            <View style={[styles.detailedStatHalf, { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#10B981' }]}>
+              <Text style={[styles.detailedStatTitle, { color: '#047857' }]}>{t('free_meals').toUpperCase()}</Text>
+              <Text style={[styles.detailedStatValue, { color: '#047857' }]}>{stats.freeCount}</Text>
+            </View>
+            <View style={[styles.detailedStatHalf, { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#EA580C' }]}>
+              <Text style={[styles.detailedStatTitle, { color: '#C2410C' }]}>{t('discount_meals').toUpperCase()}</Text>
+              <Text style={[styles.detailedStatValue, { color: '#C2410C' }]}>{stats.discountCount}</Text>
+            </View>
           </View>
           <View style={styles.totalBadgeContainer}><Text style={styles.totalBadgeText}>{t('total_offers')}: {stats.freeCount + stats.discountCount}</Text></View>
         </View>

@@ -3,9 +3,11 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/auth';
 import { TRANSLATIONS } from '../constants/translations';
-
-// NEW: Import messaging to get the token after successful login
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { client } from '../api/client';
 import messaging from '@react-native-firebase/messaging';
+// 🚀 NEW: Import the Google Client ID securely from your .env file
+import { GOOGLE_WEB_CLIENT_ID } from '@env'; 
 
 // --- TYPE DEFINITIONS ---
 export type User = {
@@ -14,21 +16,22 @@ export type User = {
   email: string;
   role: 'student' | 'restaurant' | 'admin';
   status: string;
-  // NEW: Added verification_status to fix the TypeScript error
   verification_status?: 'verified' | 'pending' | 'unverified';
 } | null;
 
 type AuthContextType = {
   user: User;
   isLoading: boolean;
-  isInitialized: boolean; // Indicates if the app has finished loading initial data on startup
+  isInitialized: boolean;
   lang: string;
   login: (email: string, pass: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => Promise<void>;
-  changeLanguage: (newLang: string) => Promise<void>; // Change language and persist to storage
-  t: (key: string, params?: Record<string, string | number>) => string; // Advanced translation function
+  changeLanguage: (newLang: string) => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>) => string;
   updateUser: (u: User) => void;
+  // 🚀 NEW: Added Google Login function type
+  loginWithGoogle: (idToken: string) => Promise<void>; 
 };
 
 // --- CONSTANT KEYS (For AsyncStorage) ---
@@ -45,96 +48,89 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // --- STATE MANAGEMENT ---
   const [user, setUser] = useState<User>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false); // For splash screen control
-  const [lang, setLang] = useState('tr'); // Default language
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [lang, setLang] = useState('tr');
 
   // --- 1. APP INITIALIZATION (BOOTSTRAP) ---
   useEffect(() => {
+    // 🚀 NEW: Configure Google Sign-In on app startup using the secure .env variable
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: true,
+    });
+
     const loadAppData = async () => {
       try {
-        // Check for saved language preference
         const storedLang = await AsyncStorage.getItem(STORAGE_KEYS.LANG);
         if (storedLang) {
           setLang(storedLang);
         }
 
-        // Check for saved user session (JWT Token/User)
         const storedUser = await AsyncStorage.getItem(STORAGE_KEYS.USER);
-        if (storedUser) {
+        const storedRefreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+
+        // Prevents "Zombie Sessions" by ensuring both User and Refresh Token exist
+        if (storedUser && storedRefreshToken) {
           setUser(JSON.parse(storedUser));
+        } else if (storedUser && !storedRefreshToken) {
+          console.log("🧹 [DEBUG] Found old zombie session without Refresh Token. Cleaning up...");
+          await AsyncStorage.multiRemove([STORAGE_KEYS.USER, STORAGE_KEYS.TOKEN, STORAGE_KEYS.REFRESH_TOKEN]);
         }
       } catch (error) {
         console.error('Error loading app data during initialization:', error);
       } finally {
-        setIsInitialized(true); // Initialization complete, we can now render app screens
+        setIsInitialized(true); 
       }
     };
 
     loadAppData();
   }, []);
 
-  // --- 2. ADVANCED TRANSLATION FUNCTION (TRANSLATE) ---
-  // Usage: t('welcome', { name: 'Meriç' }) -> "Welcome Meriç"
+  // --- 2. ADVANCED TRANSLATION FUNCTION ---
   const t = (key: string, params?: Record<string, string | number>) => {
     let translation = '';
-
-    // 1. Search in the selected language
     if (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) {
       translation = TRANSLATIONS[lang][key];
-    } 
-    // 2. Fallback to English if not found
-    else if (TRANSLATIONS['en'] && TRANSLATIONS['en'][key]) {
+    } else if (TRANSLATIONS['en'] && TRANSLATIONS['en'][key]) {
       translation = TRANSLATIONS['en'][key];
-    } 
-    // 3. Return uppercase key if completely missing (for easy spotting during development)
-    else {
+    } else {
       console.warn(`⚠️ Missing Translation Key: [${lang}] ${key}`);
       return key.toUpperCase(); 
     }
 
-    // If parameters are provided (e.g., "Hello {name}"), inject them into the string
     if (params) {
       Object.keys(params).forEach(paramKey => {
         translation = translation.replace(`{${paramKey}}`, String(params[paramKey]));
       });
     }
-
     return translation;
   };
 
-  // --- 3. LANGUAGE CHANGE OPERATION ---
+  // --- 3. LANGUAGE CHANGE ---
   const changeLanguage = async (newLang: string) => {
     try {
       setLang(newLang);
-      await AsyncStorage.setItem(STORAGE_KEYS.LANG, newLang); // Persist preference to device storage
+      await AsyncStorage.setItem(STORAGE_KEYS.LANG, newLang);
     } catch (error) {
       console.error('Failed to save language preference:', error);
     }
   };
 
-  // --- 4. LOGIN OPERATION ---
+  // --- 4. STANDARD LOGIN ---
   const login = async (email: string, pass: string) => {
     setIsLoading(true);
     try {
       const res = await authApi.login(email, pass);
       if (res.success) {
-        // Save user and token received from the backend
         setUser(res.user);
         await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
         
-        // 🚀 YENİ: Artık backend 2 bilet gönderiyor, ikisini de güvenle kaydediyoruz!
-        if (res.token) {
-          await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
-        }
-        if (res.refresh_token) {
-          await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refresh_token);
-        }
-
+        if (res.token) await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
+        if (res.refresh_token) await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refresh_token);
       } else {
         throw new Error(res.message);
       }
     } catch (error: any) {
-      // Get error message from API response or fallback to generic translation
       const errorMsg = error.response?.data?.message || error.message || t('error');
       Alert.alert(t('error'), errorMsg);
       throw error;
@@ -143,7 +139,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- 5. REGISTER OPERATION ---
+  // --- 5. GOOGLE LOGIN (NEW) ---
+  const loginWithGoogle = async (idToken: string) => {
+    setIsLoading(true);
+    try {
+      // Send the Google ID Token to our Python backend for verification
+      const res = await client.post('/auth/google', { token: idToken });
+      
+      if (res.data.success) {
+        // Save the session exactly like a standard login
+        setUser(res.data.user);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.data.user));
+        
+        if (res.data.token) await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.data.token);
+        if (res.data.refresh_token) await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.data.refresh_token);
+      } else {
+        throw new Error(res.data.message);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Google Login Verification Failed";
+      Alert.alert(t('error'), errorMsg);
+      console.error("Google Backend Auth Error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 6. REGISTER OPERATION ---
   const register = async (data: any) => {
     setIsLoading(true);
     try {
@@ -162,15 +184,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- 6. LOGOUT OPERATION ---
+  // --- 7. LOGOUT OPERATION ---
   const logout = async () => {
     setIsLoading(true);
     try {
       setUser(null);
-      // Clear session info from device but keep language preference
       await AsyncStorage.removeItem(STORAGE_KEYS.USER);
       await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
-      await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN); // 🚀 YENİ: Çıkış yaparken Refresh Token'ı da siliyoruz
+      await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      
+      // Optional: Sign out from Google completely so they can choose a different account next time
+      try {
+        await GoogleSignin.signOut();
+      } catch (e) {
+        // Ignore errors if they weren't logged in with Google
+      }
     } catch (error) {
       console.error("Error occurred during logout:", error);
     } finally {
@@ -178,42 +206,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- 7. NEW: SYNC FCM TOKEN WITH BACKEND (WITH DEBUG LOGS) ---
+  // --- 8. SYNC FCM TOKEN ---
   useEffect(() => {
-    console.log("🔄 [DEBUG] AuthContext useEffect triggered! User state is:", user);
-    
     const syncToken = async () => {
-      if (!user) {
-        console.log("⚠️ [DEBUG] User is null. Skipping token sync (probably logged out).");
-        return;
-      }
-      
-      if (!user.id) {
-        console.log("❌ [DEBUG] User object exists, but 'user.id' is MISSING! Backend might not be sending it.");
-        return;
-      }
-
-      console.log(`✅ [DEBUG] User ID found: ${user.id}. Requesting Firebase token...`);
+      if (!user || !user.id) return;
       try {
         const token = await messaging().getToken();
-        console.log(`🔥 [DEBUG] Firebase Token received! Sending to backend...`);
-        
-        // We are finally sending the token WITH the user's ID!
         await authApi.updateFcmToken(token, user.id);
-        console.log(`✅ FCM Token successfully linked to User ID: ${user.id}`);
-      } catch (error) {
-        console.error('❌ Error linking FCM token:', error);
+      } catch (error: any) {
+        console.log('⚠️ [MVP] Ignored FCM Token Sync Error:', error?.message);
       }
     };
-
     syncToken();
   }, [user]);
 
-  // --- EARLY RETURN FOR INITIALIZATION ---
-  // Return null or show a splash screen until app data is loaded
-  if (!isInitialized) {
-    return null; // Or a simple <ActivityIndicator />
-  }
+  if (!isInitialized) return null; 
 
   return (
     <AuthContext.Provider value={{ 
@@ -226,18 +233,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       logout, 
       changeLanguage, 
       t, 
-      updateUser: setUser 
+      updateUser: setUser,
+      loginWithGoogle // 🚀 NEW: Exported Google Login function
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// --- CUSTOM HOOK ---
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth hook must be used within an AuthProvider. Please wrap your app with <AuthProvider>.');
+    throw new Error('useAuth hook must be used within an AuthProvider.');
   }
   return context;
 };

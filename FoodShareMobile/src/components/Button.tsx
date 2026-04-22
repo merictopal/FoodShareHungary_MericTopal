@@ -24,8 +24,9 @@ export const Button = ({
   icon
 }: ButtonProps) => {
   
+  // Define background color based on variant
   const getBgColor = () => {
-    if (disabled) return COLORS.inputFill;
+    if (disabled) return COLORS.border;
     switch (variant) {
       case 'primary': return COLORS.primary;
       case 'secondary': return COLORS.secondary;
@@ -36,17 +37,19 @@ export const Button = ({
     }
   };
 
+  // Define text color based on variant
   const getTextColor = () => {
     if (disabled) return COLORS.textSub;
     switch (variant) {
-      case 'outline': return COLORS.primary;
+      case 'outline': return COLORS.textMain; // Outline texts are usually dark for social logins
       case 'ghost': return COLORS.textSub;
       default: return COLORS.white;
     }
   };
 
+  // Define border styles for outline buttons
   const getBorder = () => {
-    if (variant === 'outline') return { borderWidth: 1.5, borderColor: disabled ? COLORS.inputFill : COLORS.primary };
+    if (variant === 'outline') return { borderWidth: 1.5, borderColor: COLORS.border };
     return {};
   };
 
@@ -77,6 +80,7 @@ export const Button = ({
   );
 };
 
+// --- STYLES ---
 const styles = StyleSheet.create({
   container: {
     height: 56,
@@ -85,15 +89,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 12, // Slight increase for better spacing between stacked buttons
   },
   text: {
     fontSize: SIZES.medium,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   icon: {
-    fontSize: 20,
+    fontSize: 18,
     marginRight: 10,
   }
 });

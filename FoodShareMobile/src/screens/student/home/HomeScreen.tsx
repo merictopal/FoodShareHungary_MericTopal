@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { View, Text, FlatList, TouchableOpacity, Alert, StatusBar, Platform, ActivityIndicator, RefreshControl, ScrollView, PermissionsAndroid } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
+import Ionicons from 'react-native-vector-icons/Ionicons'; // 🚀 NEW: Vector Icons
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../../context/AuthContext';
 import { offersApi } from '../../../api/offers';
@@ -43,6 +45,7 @@ type FilterType = 'all' | 'free' | 'discount';
 
 const HomeScreen = ({ navigation }: any) => {
   const { user, t } = useAuth();
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
 
   const [allOffers, setAllOffers] = useState<Offer[]>([]);
@@ -149,7 +152,8 @@ const HomeScreen = ({ navigation }: any) => {
   const handleClaim = async (offerId: number, offerTitle: string) => {
     if (user?.verification_status !== 'verified') {
       return Alert.alert(t('error') || "Verification Required", "You need to upload your student ID to claim meals.", [
-        { text: t('cancel') || "Cancel", style: "cancel" }, { text: "Go to Profile", onPress: () => navigation.navigate('Profile') }
+        // 🚀 FIXED: Navigates to the correct new tab route 'ProfileTab'
+        { text: t('cancel') || "Cancel", style: "cancel" }, { text: "Go to Profile", onPress: () => navigation.navigate('ProfileTab') }
       ]);
     }
     Alert.alert(t('claim_btn'), `${t('confirm_claim')} "${offerTitle}"?`, [
@@ -182,12 +186,12 @@ const HomeScreen = ({ navigation }: any) => {
           ))}
         </MapView>
         <TouchableOpacity style={styles.myLocationBtn} onPress={centerMap} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><Text style={styles.locationIcon}>⌖</Text></TouchableOpacity>
-        <View style={styles.headerOverlay}>
-          <Header title={headerGreeting} rightIcon={userInitial} onRightPress={() => navigation.navigate('Profile')} transparent />
+        <View style={[styles.headerOverlay, { top: insets.top + 10, width: '100%', position: 'absolute', zIndex: 10 }]}>
+          <Header title={headerGreeting} rightIcon={userInitial} onRightPress={() => navigation.navigate('ProfileTab')} transparent />
         </View>
       </View>
 
-      <View style={styles.listContainer}>
+      <View style={[styles.listContainer, { borderTopLeftRadius: 24, borderTopRightRadius: 24 }]}>
         <View style={styles.handleBar} />
         {loading ? (
           <View style={styles.centerContent}><ActivityIndicator size="large" color={COLORS.primary} /><Text style={styles.loadingText}>Loading...</Text></View>
@@ -203,7 +207,12 @@ const HomeScreen = ({ navigation }: any) => {
 
             {recommendedOffers.length > 0 && (
               <View style={styles.sectionContainer}>
-                <Text style={[styles.sectionTitle, { color: COLORS.primary }]}>✨ {t('recommended')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 4 }}>
+                  <Ionicons name="sparkles" size={20} color="#F59E0B" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: COLORS.primary, letterSpacing: -0.5 }}>
+                    {t('recommended')}
+                  </Text>
+                </View>
                 <FlatList data={recommendedOffers} horizontal showsHorizontalScrollIndicator={false} renderItem={({item}) => <RecommendedCard item={item} onPressMap={animateToLocation} onClaim={handleClaim} t={t} />} keyExtractor={(item) => `ai-${item.id}`} contentContainerStyle={{ paddingHorizontal: 20 }} />
               </View>
             )}
