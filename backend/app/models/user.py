@@ -14,6 +14,14 @@ class User(db.Model):
     # Added phone number for security and communication
     phone = db.Column(db.String(20), nullable=True) 
     
+    # --- NEW: DEMOGRAPHIC & TARGETING FIELDS ---
+    date_of_birth = db.Column(db.String(20), nullable=True) 
+    gender = db.Column(db.String(50), nullable=True)
+    occupation = db.Column(db.String(100), nullable=True)
+    university = db.Column(db.String(150), nullable=True)
+    major = db.Column(db.String(150), nullable=True)
+    study_year = db.Column(db.String(20), nullable=True)
+    
     # Security: Stores hashed passwords, never plain text
     password_hash = db.Column(db.String(255), nullable=False)
     
@@ -29,7 +37,6 @@ class User(db.Model):
     level = db.Column(db.Integer, default=1)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
     fcm_token = db.Column(db.String(255), nullable=True)
     
     # Clean, single-source-of-truth relationships with fully qualified paths
@@ -52,11 +59,18 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
+        """Serializes user data to send to the frontend."""
         return {
             'id': self.id,
             'name': self.name,
             'email': self.email,
             'phone': self.phone,
+            'date_of_birth': self.date_of_birth,
+            'gender': self.gender,
+            'occupation': self.occupation,
+            'university': self.university,
+            'major': self.major,
+            'study_year': self.study_year,
             'role': self.role,
             'status': self.verification_status,
             'joined_at': self.created_at.strftime('%d-%m-%Y'),

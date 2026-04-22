@@ -12,7 +12,7 @@ import { COLORS, SIZES } from '../constants/theme';
 // --- INTERFACES ---
 interface InputProps extends TextInputProps {
   label?: string;
-  icon?: string | React.ReactNode; // Flexible: Can accept standard text or actual Icon components later
+  icon?: string | React.ReactNode; 
   error?: string;
   isPassword?: boolean;
 }
@@ -49,14 +49,14 @@ export const Input = ({ label, icon, error, isPassword, style, ...props }: Input
         {/* --- TEXT FIELD --- */}
         <TextInput
           style={styles.input}
-          placeholderTextColor={COLORS.textSub || '#A0A0A0'}
+          placeholderTextColor={COLORS.placeholder}
           secureTextEntry={isPassword && !showPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
         />
 
-        {/* --- PASSWORD TOGGLE (Clean Typography instead of Emojis) --- */}
+        {/* --- PASSWORD TOGGLE (Clean Typography) --- */}
         {isPassword && (
           <TouchableOpacity 
             onPress={() => setShowPassword(!showPassword)}
@@ -64,7 +64,7 @@ export const Input = ({ label, icon, error, isPassword, style, ...props }: Input
             style={styles.toggleBtn}
           >
             <Text style={styles.toggleText}>
-              {showPassword ? 'HIDE' : 'SHOW'}
+              {showPassword ? 'Hide' : 'Show'}
             </Text>
           </TouchableOpacity>
         )}
@@ -82,30 +82,29 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   label: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 13, // Slightly larger for sentence case
+    fontWeight: '700',
     color: COLORS.textSub,
     marginBottom: 8,
     marginLeft: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5 // Adds a premium look to small uppercase text
+    // Removed uppercase transformation based on UX feedback
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA', // Clean, slightly off-white background
-    borderRadius: 12, // Modern, smooth corners
+    backgroundColor: COLORS.inputFill, 
+    borderRadius: SIZES.radius, // 10px for slightly sharper, structured look
     height: 56,
     paddingHorizontal: 16,
     borderWidth: 1.5,
-    borderColor: '#EEEEEE',
+    borderColor: COLORS.border, // Visible border added
   },
   focused: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#FFFFFF', // Pops out when focused
+    borderColor: COLORS.primary, // Highlights with Terra Cotta on focus
+    backgroundColor: '#FFFFFF',
   },
   errorBorder: {
-    borderColor: '#FF3B30' // Standard red error color
+    borderColor: COLORS.danger
   },
   iconBox: { 
     marginRight: 12, 
@@ -122,28 +121,24 @@ const styles = StyleSheet.create({
     color: COLORS.textMain, 
     fontSize: 15,
     fontWeight: '500',
-    height: '100%', // Ensures the tap target area is large enough
+    height: '100%', 
   },
-  
-  // Premium Typographic Toggle Button
   toggleBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F0F0', // Subtle button background
-    borderRadius: 6,
+    backgroundColor: '#F0F0F0', 
+    borderRadius: SIZES.radiusSm,
     marginLeft: 10
   },
   toggleText: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '800',
     color: COLORS.textSub,
-    letterSpacing: 0.5
   },
-  
   errorText: { 
-    color: '#FF3B30', 
+    color: COLORS.danger, 
     fontSize: 12, 
     marginTop: 6, 
     marginLeft: 4,

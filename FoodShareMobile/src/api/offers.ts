@@ -1,12 +1,11 @@
 import { client } from './client';
-// Imported Asset to define the type of the selected photo
 import { Asset } from 'react-native-image-picker';
 
 // --- INTERFACES ---
 export interface CreateOfferData {
-  user_id: number;      
-  title: string;        
-  description: string; 
+  user_id: number;
+  title: string;
+  description: string;
   type: 'free' | 'discount';
   quantity: number;
   discount_rate: number;
@@ -19,7 +18,7 @@ export interface ClaimOfferData {
 
 // --- API ROUTES ---
 export const offersApi = {
-  
+
   // ==========================================
   // RESTAURANT ROUTES
   // ==========================================
@@ -33,20 +32,15 @@ export const offersApi = {
     return client.post('/offers/create', payload);
   },
 
-  // NEW: Function to handle offer creation with an image upload
   createWithImage: async (data: CreateOfferData, photo: Asset) => {
-    // 1. Create the offer using the standard text-based endpoint first
     const createRes = await offersApi.create(data);
-    
-    // 🚀 FIXED: Added .data here! Axios wraps backend responses inside a 'data' object.
     const offerId = createRes.data?.offer_id;
-    
+
     if (!offerId) {
-      console.warn("Offer created, but no offer_id was returned. Cannot upload image.");
+      console.warn("Offer created, but no offer_id returned. Cannot upload image.");
       return createRes;
     }
 
-    // 3. Package the image into a FormData object for multipart/form-data upload
     const formData = new FormData();
     formData.append('offer_id', offerId.toString());
     formData.append('file', {
@@ -55,18 +49,25 @@ export const offersApi = {
       name: photo.fileName || `offer-${offerId}.jpg`,
     } as any);
 
-    // 4. Send the image to the AWS S3 upload route
     const uploadRes = await client.post('/upload/offer-image', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
 
     return { ...createRes, upload_status: uploadRes };
   },
 
+  // NEW: Fetches all active offers for the logged-in restaurant
+  getMyOffers: (userId: number) => {
+    return client.get(`/offers/my-offers?user_id=${userId}`);
+  },
+
+  // NEW: Soft-deletes (deactivates) an offer by its ID
+  deleteOffer: (offerId: number, userId: number) => {
+    return client.delete(`/offers/delete/${offerId}?user_id=${userId}`);
+  },
+
   verifyQr: (qrCode: string) => {
-    return client.post('/claims/verify', { qr_code: qrCode }); 
+    return client.post('/claims/verify', { qr_code: qrCode });
   },
 
   // ==========================================

@@ -82,3 +82,25 @@ def get_current_user(user_id):
         'success': True,
         'user': user_data
     }), 200
+
+# --- GOOGLE OAUTH LOGIN ---
+@auth_bp.route('/google', methods=['POST'])
+def google_login():
+    """
+    Handles Google OAuth login.
+    Receives the Google ID Token, verifies it, and returns JWT tokens.
+    Public endpoint.
+    """
+    data = request.get_json()
+    result = AuthService.google_login(data)
+    return jsonify(result), result['status']
+
+# --- FORGOT PASSWORD ---
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """
+    Receives an email address and triggers the password reset email flow.
+    """
+    data = request.get_json()
+    result = AuthService.forgot_password(data)
+    return jsonify(result), result['status']
