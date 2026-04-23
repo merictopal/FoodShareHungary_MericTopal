@@ -1,18 +1,21 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, RefreshControl, TouchableOpacity, StatusBar, Alert, ActivityIndicator, ScrollView, Image } from 'react-native';
+import { 
+  View, Text, RefreshControl, TouchableOpacity, 
+  StatusBar, Alert, ActivityIndicator, ScrollView, Image 
+} from 'react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 
-// Context & API
+// --- CONTEXT & API ---
 import { useAuth } from '../../../context/AuthContext';
 import { offersApi } from '../../../api/offers';
 import { client } from '../../../api/client'; 
 
-// Constants & Components
+// --- CONSTANTS & COMPONENTS ---
 import { COLORS } from '../../../constants/theme';
 import { Header } from '../../../components/Header';
 import { Button } from '../../../components/Button';
 
-// Local Components & Styles
+// --- LOCAL COMPONENTS & STYLES ---
 import { styles } from './styles';
 import { HistoryCard, HistoryItem } from './components/HistoryCard';
 import { LanguageModal } from './components/LanguageModal';
@@ -33,36 +36,41 @@ export interface UserStats {
 type TabType = 'all' | 'free' | 'discount';
 
 const ProfileScreen = ({ navigation }: any) => {
+  // --- HOOKS & GLOBAL CONTEXT ---
   const { user, logout, t, lang, changeLanguage, updateUser } = useAuth();  
   
+  // --- CORE STATE MANAGEMENT ---
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   
-  // Modals Visibility
+  // --- MODALS VISIBILITY STATE ---
   const [selectedQr, setSelectedQr] = useState<string | null>(null);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   
-  // Doc Upload State
+  // --- DOCUMENT UPLOAD STATE ---
   const [docType, setDocType] = useState<'student' | 'pensioner' | 'social'>('student');
   const [docImage, setDocImage] = useState<Asset | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   
-  // 🚀 NEW: Avatar Upload State
+  // --- AVATAR UPLOAD STATE ---
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
+  // --- USER STATISTICS STATE ---
   const [stats, setStats] = useState<UserStats>({ 
     totalOrders: 0, freeCount: 0, discountCount: 0, points: 0, level: 1, rank: 0, nextLevelPoints: 100 
   });
 
+  // --- MOCK DATA ---
   const mockNotifications = [
     { id: 1, title: 'Welcome to FoodShare! 🎉', body: 'Start exploring offers around you.', time: 'Just now', unread: true },
     { id: 2, title: 'New Level Unlocked', body: 'You reached a new Level!', time: '2 hours ago', unread: false }
   ];
 
+  // --- HELPER FUNCTIONS ---
   const getLevelTitle = (level: number) => {
     if (level >= 10) return t('lvl_legend');
     if (level >= 8) return t('lvl_local_hero');
@@ -71,8 +79,10 @@ const ProfileScreen = ({ navigation }: any) => {
     return t('lvl_newbie');
   };
 
-  // --- FETCH HISTORY (WITH DETAILED DEBUGGING) ---
-  const fetchHistory = async () => {
+  // --- FETCH HISTORY (BULLETPROOF AGAINST INFINITE LOOPS) ---
+  // Wrapped in useCallback to memoize the function and prevent re-creation on every render.
+  // It only re-creates if the user.id actually changes, completely stopping the 429 API barrage.
+  const fetchHistory = useCallback(async () => {
     if (!user?.id) return;
     
     try {
@@ -80,6 +90,7 @@ const ProfileScreen = ({ navigation }: any) => {
       console.log(`🔄 [DEBUG] Fetching user details for ID: ${user.id}...`);
       const userRes = await client.get(`/auth/me/${user.id}`); 
       
+      // Update global context only if valid data is received
       if (userRes.data && userRes.data.user) {
         updateUser(userRes.data.user);
       }
@@ -91,6 +102,7 @@ const ProfileScreen = ({ navigation }: any) => {
       const data: HistoryItem[] = Array.isArray(res.data) ? res.data : (res.data.history || []);
       setHistory(data);
       
+      // Process history to calculate stats
       const validatedHistory = data.filter(i => i.status === 'validated');
       const free = validatedHistory.filter(i => i.type === 'free').length;
       const discount = validatedHistory.filter(i => i.type === 'discount').length;
@@ -110,41 +122,39 @@ const ProfileScreen = ({ navigation }: any) => {
       console.log(`✅ [DEBUG] Profile data fetched successfully!`);
 
     } catch (error: any) {
-      // --- REAL ERROR LOGGING (NO MOCKS) ---
       console.log("❌ [DEBUG] PROFILE FETCH FAILED!");
-      
       if (error.response) {
-        // The request was made and the server responded with a status code outside the 2xx range
         console.log("🚨 Status Code:", error.response.status);
         console.log("🚨 Backend Response:", JSON.stringify(error.response.data, null, 2));
-        console.log("🚨 Failed Endpoint:", error.config?.url);
       } else if (error.request) {
-        // The request was made but no response was received (Network error, CORS, Server down)
-        console.log("🚨 No response received from backend. Is the server running and accessible?");
+        console.log("🚨 No response received from backend.");
       } else {
-        // Something happened in setting up the request that triggered an Error
         console.log("🚨 Axios Error Message:", error.message);
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user?.id]); // Only depend on user ID to prevent context-driven infinite loops
 
+  // Execute fetchHistory exactly once upon component mount or when user ID changes
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
+  // Pull-to-refresh handler
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
+  // Filter history based on the active tab selection
   const filteredHistory = useMemo(() => {
     if (activeTab === 'all') return history;
     return history.filter(item => item.type === activeTab);
   }, [history, activeTab]);
 
+  // --- ACTIONS ---
   const handleLogout = () => {
     Alert.alert(t('logout'), t('logout_confirm_msg'), [
       { text: t('cancel'), style: "cancel" },
@@ -157,7 +167,7 @@ const ProfileScreen = ({ navigation }: any) => {
     setLangModalVisible(false);
   };
 
-  // 🚀 NEW: Avatar Selection & Upload Logic
+  // Avatar Selection & Upload Logic
   const handleEditProfile = () => {
     Alert.alert(t('choose_avatar_method') || "Change Profile Picture", "", [
       { 
@@ -193,12 +203,11 @@ const ProfileScreen = ({ navigation }: any) => {
         name: asset.fileName || `avatar-${user.id}.jpg` 
       } as any);
 
-      // Call our brand new backend API route
       const response = await client.post('/upload/user-avatar', formData, { 
         headers: { 'Content-Type': 'multipart/form-data' } 
       });
       
-      // Update global AuthContext with the new avatar URL so it shows instantly
+      // Instantly update the UI by altering the global context
       if (response.data.success) {
         updateUser({ ...user, avatar_url: response.data.url });
         Alert.alert(t('success') || "Success", "Profile picture updated!");
@@ -226,7 +235,9 @@ const ProfileScreen = ({ navigation }: any) => {
       formData.append('user_id', String(user?.id));
       formData.append('document_type', docType);
       formData.append('file', { uri: docImage.uri, type: docImage.type || 'image/jpeg', name: docImage.fileName || `doc.jpg` } as any);
+      
       await client.post('/upload/user-document', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      
       if (user) updateUser({ ...user, verification_status: 'pending' });
       Alert.alert(t('success') || "Success!", t('msg_verify_sent') || "Your document has been sent.");
       setVerificationModalVisible(false);
@@ -246,13 +257,15 @@ const ProfileScreen = ({ navigation }: any) => {
     } else Alert.alert(t(item).toUpperCase(), "This feature will be available soon!");
   };
 
-const renderHeader = () => {
+  // --- RENDER HEADER SECTION ---
+  const renderHeader = () => {
     const isVerified = user?.verification_status === 'verified';
     const isPending = user?.verification_status === 'pending';
     const progressPercentage = stats.points > 0 ? Math.min((stats.points / stats.nextLevelPoints) * 100, 100) : 0;
 
     return (
       <View style={styles.headerWrapper}>
+        {/* Profile Information */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
              {uploadingAvatar ? (
@@ -288,6 +301,7 @@ const renderHeader = () => {
           </View>
         </View>
 
+        {/* Verification Banners */}
         {isPending && (
           <View style={[styles.verificationBanner, { backgroundColor: '#FFFBEB', borderColor: '#FEF08A' }]}>
             <View style={[styles.bannerIconBox, { backgroundColor: '#FEF08A' }]}>
@@ -311,7 +325,7 @@ const renderHeader = () => {
           </TouchableOpacity>
         )}
 
-        {/* 🚀 FIXED: XP and Progress Bar are now Gold/Amber instead of Red for positive reinforcement */}
+        {/* Experience & Level Progress */}
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
             <Text style={styles.levelText}>LEVEL {stats.level} • {getLevelTitle(stats.level)}</Text>
@@ -322,7 +336,7 @@ const renderHeader = () => {
           </View>
         </View>
 
-        {/* 🚀 NEW: Gamification Badges Section */}
+        {/* Gamification Badges Row */}
         <View style={{ marginTop: 10, marginBottom: 20 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             {t('my_badges') || "My Badges"}
@@ -356,6 +370,7 @@ const renderHeader = () => {
           </ScrollView>
         </View>
 
+        {/* User Savings Statistics */}
         <View style={styles.statsCard}>
           <Text style={styles.statsTitle}>{t('savings_report')}</Text>
           <View style={styles.statsGrid}>
@@ -367,7 +382,7 @@ const renderHeader = () => {
           </View>
         </View>
 
-        {/* 🚀 FIXED: Improved Contrast for Free/Discount Blocks */}
+        {/* Detailed Discount Breakdown */}
         <View style={styles.detailedStatsWrapper}>
           <View style={styles.detailedStatsContainer}>
             <View style={[styles.detailedStatHalf, { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#10B981' }]}>
@@ -382,6 +397,7 @@ const renderHeader = () => {
           <View style={styles.totalBadgeContainer}><Text style={styles.totalBadgeText}>{t('total_offers')}: {stats.freeCount + stats.discountCount}</Text></View>
         </View>
 
+        {/* Horizontal Quick Actions Menu */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickMenu}>
           {['notifications', 'security', 'help'].map((item) => (
              <TouchableOpacity key={item} style={styles.menuChip} onPress={() => handleQuickMenuPress(item)}>
@@ -390,6 +406,7 @@ const renderHeader = () => {
           ))}
         </ScrollView>
 
+        {/* History Filtering Tabs */}
         <View style={styles.tabsContainer}>
           {(['all', 'free', 'discount'] as TabType[]).map((tab) => (
             <TouchableOpacity key={tab} style={[styles.tabBtn, activeTab === tab && styles.tabActive]} onPress={() => setActiveTab(tab)}>
@@ -401,6 +418,7 @@ const renderHeader = () => {
     );
   };
 
+  // --- MAIN RENDER ---
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -412,6 +430,7 @@ const renderHeader = () => {
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
           {renderHeader()}
           
+          {/* Empty State */}
           {filteredHistory.length === 0 && (
             <View style={styles.emptyBox}>
               <View style={styles.emptyIconCircle}><Text style={styles.emptyIconText}>!</Text></View>
@@ -419,6 +438,7 @@ const renderHeader = () => {
             </View>
           )}
 
+          {/* Pending Offers List */}
           {filteredHistory.filter(i => i.status === 'pending').length > 0 && (
             <View style={styles.listSection}>
               <Text style={[styles.sectionHeaderTitle, { color: '#F39C12' }]}>{t('pending_offers')} ({filteredHistory.filter(i => i.status === 'pending').length})</Text>
@@ -428,6 +448,7 @@ const renderHeader = () => {
             </View>
           )}
 
+          {/* Validated Offers List */}
           {filteredHistory.filter(i => i.status === 'validated').length > 0 && (
             <View style={styles.listSection}>
               <Text style={[styles.sectionHeaderTitle, { color: '#2ECC71' }]}>{t('validated_offers')} ({filteredHistory.filter(i => i.status === 'validated').length})</Text>
@@ -439,10 +460,12 @@ const renderHeader = () => {
         </ScrollView>
       )}
 
+      {/* Logout Button */}
       <View style={styles.footer}>
          <Button title={t('logout')} onPress={handleLogout} variant="secondary" style={styles.logoutBtn} textStyle={styles.logoutText}/>
       </View>
 
+      {/* Modals Collection */}
       <LanguageModal visible={langModalVisible} onClose={() => setLangModalVisible(false)} currentLang={lang} onSelectLanguage={switchLanguage} t={t} />
       <NotificationModal visible={notifModalVisible} onClose={() => setNotifModalVisible(false)} notifications={mockNotifications} t={t} />
       <QrModal visible={!!selectedQr} onClose={() => setSelectedQr(null)} qrCode={selectedQr} t={t} />
