@@ -142,10 +142,9 @@ Only folders/files that are part of the repository are shown (dependencies, buil
 │   │                            Offers, AuditLogs), App.tsx
 │   └── package.json
 ├── docs/                        short per-domain technical notes (auth, claims, qr, documents, location, ...)
-├── scripts/run_checks.py        quality gate: backend smoke+edge tests + TypeScript error ratchet
-├── .claude/                     development-tool configuration (push hook, rules, launch configs,
-│                                hooks/tsc-baseline.json used by run_checks.py)
-├── CLAUDE.md                    repository conventions
+├── scripts/
+│   ├── run_checks.py            quality gate: backend smoke+edge tests + TypeScript error ratchet
+│   └── tsc-baseline.json        allowed TypeScript error counts per frontend (used by run_checks.py)
 ├── PROJECT_STATE.md             current technical state, test evidence, open issues
 └── SCHEDULE.md                  project schedule
 ```
@@ -471,7 +470,7 @@ python scripts/run_checks.py --all    # everything
 ```
 
 Runs `pytest -m "smoke or edge"` in `backend/` and a TypeScript *ratchet*: the number of `tsc` errors per frontend
-must not exceed `.claude/hooks/tsc-baseline.json` (admin 1, mobile 14). Requires `npx` on `PATH`.
+must not exceed `scripts/tsc-baseline.json` (admin 1, mobile 14). Requires `npx` on `PATH`.
 Exit code 0 = green, 1 = a check failed, 2 = a check could not run.
 
 ### 8.2 Backend smoke and edge tests (read-only)
@@ -631,4 +630,3 @@ The thesis document itself is not part of this repository.
   [`qr.md`](docs/qr.md), [`documents.md`](docs/documents.md), [`location.md`](docs/location.md),
   [`recommendations.md`](docs/recommendations.md), [`notifications.md`](docs/notifications.md),
   [`admin.md`](docs/admin.md), [`testing.md`](docs/testing.md), [`thesis.md`](docs/thesis.md).
-- [`CLAUDE.md`](CLAUDE.md) – repository conventions (API error format, roles, security rules).

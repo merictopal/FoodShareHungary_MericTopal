@@ -24,7 +24,8 @@ __pycache__/
 *.py[cod]
 
 # --- Personal / agent tooling (not part of the project source) ---
-.claude/settings.local.json
+.claude/
+CLAUDE.md
 .agents/
 .codex/
 AGENTS.md

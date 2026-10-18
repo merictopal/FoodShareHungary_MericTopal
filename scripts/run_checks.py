@@ -8,11 +8,11 @@ FoodShare quality gate: smoke + edge tests and TypeScript ratchet.
 
 Checks
   backend   pytest -m "smoke or edge" (in-process, read-only against the dev DB)
-  admin     tsc -b --noEmit   -> error count must not exceed .claude/hooks/tsc-baseline.json
+  admin     tsc -b --noEmit   -> error count must not exceed scripts/tsc-baseline.json
   mobile    tsc --noEmit      -> same ratchet
 
 Exit code 0 = all green, 1 = at least one check failed, 2 = a check could not run.
-Used by .claude/hooks/pre_push_gate.py; safe to run by hand.
+Can also be called from a local pre-push hook; safe to run by hand.
 """
 import argparse
 import json
@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASELINE_FILE = os.path.join(ROOT, ".claude", "hooks", "tsc-baseline.json")
+BASELINE_FILE = os.path.join(ROOT, "scripts", "tsc-baseline.json")
 
 TS_PACKAGES = {
     "admin-dashboard": ["tsc", "-b", "--noEmit"],
