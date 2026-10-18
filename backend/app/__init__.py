@@ -21,6 +21,9 @@ def create_app(config_name='default'):
     
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
+
+    if not app.config.get('JWT_SECRET_KEY'):
+        raise RuntimeError("JWT_SECRET_KEY is not set. Add a long random value to backend/.env before starting the server.")
     
     db.init_app(app)
     
