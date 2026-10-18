@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,11 +15,15 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator(); 
 
 // --- FALLBACK ERROR SCREEN ---
-const ErrorScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Error: User role is not recognized.</Text>
-  </View>
-);
+const ErrorScreen = () => {
+  const { t } = useAuth();
+
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>{t('role_not_recognized')}</Text>
+    </View>
+  );
+};
 
 // --- STUDENT BOTTOM TAB NAVIGATOR ---
 const StudentTabNavigator = () => {
@@ -78,10 +82,6 @@ const StudentTabNavigator = () => {
 // --- MAIN APPLICATION STACK ---
 export const AppStack = () => {
   const { user } = useAuth();
-
-  useEffect(() => {
-    console.log("🟢 AppStack Loaded. Active User:", JSON.stringify(user, null, 2));
-  }, [user]);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

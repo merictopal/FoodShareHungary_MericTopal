@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Store, UtensilsCrossed, 
   LogOut, FileText, CheckCircle, XCircle, Eye, ShieldAlert
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend 
@@ -76,7 +76,8 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
-    navigate('/'); 
+    clearAdminSession();
+    navigate('/', { replace: true });
   };
 
   // Helper to format document types nicely

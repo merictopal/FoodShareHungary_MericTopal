@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users as UsersIcon, Store, UtensilsCrossed, 
   LogOut, FileText, CheckCircle, XCircle, Eye, Search 
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 
 // Interface for pending users waiting for approval
 interface PendingUser {
@@ -45,7 +45,8 @@ export default function PendingDocs() {
   }, []);
 
   const handleLogout = () => {
-    navigate('/'); 
+    clearAdminSession();
+    navigate('/', { replace: true });
   };
 
   // Handle Approve or Reject actions

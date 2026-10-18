@@ -1,40 +1,74 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Marker, Callout } from 'react-native-maps';
+import { View, Text } from 'react-native';
+import { Marker } from 'react-native-maps';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
 import { styles } from '../styles';
-import { Offer } from '../HomeScreen';
+import { COLORS } from '../../../../constants/theme';
+
+import type { RestaurantGroup } from '../utils';
 
 interface Props {
-  offer: Offer;
-  onPressMap: (lat: number, lng: number) => void;
-  onClaim: (id: number, desc: string) => void;
-  t: any;
+  restaurant: RestaurantGroup;
+  onSelect: (restaurant: RestaurantGroup) => void;
 }
 
-export const MapMarkerItem: React.FC<Props> = ({ offer, onPressMap, onClaim, t }) => {
-  const isFree = offer.type === 'free';
-  const markerText = isFree ? 'F' : 'D'; 
-  
+// One marker per restaurant; pressing it opens the RestaurantInfoCard (which replaced the per-offer Callout).
+const MapMarkerItemComponent: React.FC<Props> = ({
+  restaurant,
+  onSelect,
+}) => {
+  const hasFree = restaurant.hasFree;
+  const count = restaurant.offers.length;
+
   return (
     <Marker
-      coordinate={{ latitude: Number(offer.lat), longitude: Number(offer.lng) }}
-      title={offer.restaurant}
-      description={offer.description}
-      onPress={() => onPressMap(Number(offer.lat), Number(offer.lng))}
+      coordinate={{
+        latitude: restaurant.lat,
+        longitude: restaurant.lng,
+      }}
+      // Round icon: its centre is the restaurant's position (the default bottom-centre anchor drew it above).
+      // No `title`: the native info bubble duplicated the RestaurantInfoCard and slid under the Home header.
+      anchor={{ x: 0.5, y: 0.5 }}
+      onPress={() => onSelect(restaurant)}
     >
-      <View style={[styles.customMarker, isFree ? styles.borderSuccess : styles.borderWarning]}>
-        <Text style={[styles.markerText, isFree ? styles.textSuccess : styles.textWarning]}>{markerText}</Text>
-      </View>
-
-      <Callout tooltip onPress={() => onClaim(offer.id, offer.description)}>
-        <View style={styles.calloutBubble}>
-          <Text style={styles.calloutTitle}>{offer.restaurant}</Text>
-          <Text style={styles.calloutDesc} numberOfLines={1}>{offer.description}</Text>
-          <TouchableOpacity style={[styles.calloutBtn, isFree ? styles.bgSuccess : styles.bgWarning]} activeOpacity={0.8}>
-            <Text style={styles.calloutBtnText}>{t('claim_btn')} ➤</Text>
-          </TouchableOpacity>
+      {/* Padded wrapper: the marker is snapshotted to a bitmap, so the badge must stay inside its bounds */}
+      <View style={styles.markerWrap}>
+        <View
+          style={[
+            styles.customMarker,
+            hasFree
+              ? styles.borderSuccess
+              : styles.borderWarning,
+          ]}
+        >
+          <Ionicons
+            name={
+              hasFree
+                ? 'gift-outline'
+                : 'pricetag-outline'
+            }
+            size={15}
+            color={
+              hasFree
+                ? COLORS.success
+                : COLORS.warning
+            }
+          />
         </View>
-      </Callout>
+
+        {/* Active offer count of this restaurant */}
+        {count > 1 && (
+          <View style={styles.markerCountBadge}>
+            <Text style={styles.markerCountText}>
+              {count}
+            </Text>
+          </View>
+        )}
+      </View>
     </Marker>
   );
 };
+
+// Memoized: Home re-renders on unrelated state (filter chips, QR modal, refresh flags).
+export const MapMarkerItem = React.memo(MapMarkerItemComponent);

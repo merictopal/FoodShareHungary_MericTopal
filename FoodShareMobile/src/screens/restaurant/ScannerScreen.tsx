@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { useNavigation } from '@react-navigation/native';
 // Import the API service to communicate with the Python backend
 import { offersApi } from '../../api/offers';
+import { apiErrorKey, verifySuccessMessage } from '../../utils/apiErrors';
+import { useAuth } from '../../context/AuthContext';
+import { Button } from '../../components/Button';
+import { COLORS, SIZES, SPACING } from '../../constants/theme';
 
 // 🚀 THE ABSOLUTE FIX: Module-level lock! 
 // This lives outside of React's lifecycle and cannot be bypassed by 60FPS camera frames.
@@ -11,11 +17,14 @@ let isGlobalScanLocked = false;
 
 export default function ScannerScreen() {
   // State management for camera permissions, scanning status, and API loading
-  const [hasPermission, setHasPermission] = useState(false);
+  // 'pending' until the system dialog answers, so "denied" isn't flashed while asking
+  const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [isScanned, setIsScanned] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const navigation = useNavigation();
+  const { t } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Get the back camera of the device
   const device = useCameraDevice('back');
@@ -27,7 +36,7 @@ export default function ScannerScreen() {
     // Request native camera permissions on component mount
     (async () => {
       const status = await Camera.requestCameraPermission();
-      setHasPermission(status === 'granted');
+      setPermission(status === 'granted' ? 'granted' : 'denied');
     })();
   }, []);
 
@@ -55,13 +64,13 @@ export default function ScannerScreen() {
             setLoading(false);
             
             // Extract the dynamic success message (XP and Points) from the backend
-            const successMsg = res.data?.message || res.message || 'Validation Successful!';
+            const successMsg = verifySuccessMessage(res.data, t);
             
             // Wrap the Alert in a setTimeout for native UI stability
             setTimeout(() => {
-              Alert.alert('Success!', successMsg, [
+              Alert.alert(t('success'), successMsg, [
                 { 
-                  text: 'OK', 
+                  text: t('ok'), 
                   onPress: () => {
                     // Navigate back. The lock remains TRUE so no rogue frames can trigger anything while closing.
                     navigation.goBack(); 
@@ -74,12 +83,12 @@ export default function ScannerScreen() {
             // Instantly stop the loading spinner if validation fails
             setLoading(false);
             
-            const errorMsg = e.response?.data?.message || 'Invalid or expired QR Code.';
+            const errorMsg = t(apiErrorKey(e, 'scanner_invalid_qr'));
             
             setTimeout(() => {
-              Alert.alert('Verification Failed', errorMsg, [
+              Alert.alert(t('scanner_verify_failed'), errorMsg, [
                 {
-                  text: 'Scan Again',
+                  text: t('scanner_scan_again'),
                   onPress: () => {
                     // UNLOCK THE GATE only because the user explicitly wants to try again
                     isGlobalScanLocked = false;
@@ -87,7 +96,7 @@ export default function ScannerScreen() {
                   }
                 },
                 {
-                  text: 'Cancel',
+                  text: t('cancel'),
                   style: 'cancel',
                   onPress: () => {
                     navigation.goBack();
@@ -100,19 +109,53 @@ export default function ScannerScreen() {
     }
   });
 
-  // Handle loading and permission UI states
-  if (!hasPermission) {
+  // --- PERMISSION / DEVICE STATES ---
+  if (permission === 'pending') {
     return (
       <View style={styles.center}>
-        <Text>No camera permission granted.</Text>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
-  if (device == null) {
+  if (permission === 'denied' || device == null) {
+    const denied = permission === 'denied';
+
     return (
-      <View style={styles.center}>
-        <Text>No camera device found on this emulator/phone.</Text>
+      <View style={[styles.center, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.stateIcon}>
+          <Ionicons
+            name={denied ? 'videocam-off-outline' : 'camera-outline'}
+            size={30}
+            color={COLORS.primary}
+          />
+        </View>
+
+        {denied && (
+          <Text style={styles.stateTitle}>{t('scanner_permission_title')}</Text>
+        )}
+
+        <Text style={styles.stateText}>
+          {denied ? t('scanner_no_permission') : t('scanner_no_device')}
+        </Text>
+
+        {/* Settings is the only place a permanently denied camera permission can be granted again */}
+        {denied && (
+          <Button
+            title={t('open_settings')}
+            onPress={() => Linking.openSettings()}
+            style={styles.stateButton}
+            icon={<Ionicons name="settings-outline" size={18} color={COLORS.white} />}
+          />
+        )}
+
+        <Button
+          title={t('a11y_go_back')}
+          onPress={() => navigation.goBack()}
+          variant="outline"
+          style={styles.stateButton}
+          icon={<Ionicons name="arrow-back-outline" size={18} color={COLORS.primary} />}
+        />
       </View>
     );
   }
@@ -123,80 +166,177 @@ export default function ScannerScreen() {
         style={StyleSheet.absoluteFill}
         device={device}
         // Pause the camera feed while processing the API request
-        isActive={!isScanned} 
+        isActive={!isScanned}
         codeScanner={codeScanner}
       />
-      
-      {/* Custom UI overlay for the scanner interface */}
-      <View style={styles.overlay}>
-        <View style={styles.scanArea} />
-        
-        {/* Show a loading spinner while waiting for the backend response */}
-        {loading && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#00FF00" />
-            <Text style={styles.loadingText}>Verifying with server...</Text>
-          </View>
-        )}
 
-        <TouchableOpacity 
-          style={styles.cancelButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
+      {/* FoodShare-styled overlay; purely visual, scanning is handled above */}
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={[styles.topBar, { paddingTop: insets.top + SPACING.sm }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y_go_back')}
+          >
+            <Ionicons name="chevron-back" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          <Text style={styles.topTitle} numberOfLines={1}>{t('scan_qr_btn')}</Text>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
+
+        <View style={styles.middle}>
+          <Text style={styles.hint}>{t('scanner_hint')}</Text>
+          <View style={styles.scanArea} />
+
+          {/* Show a loading spinner while waiting for the backend response */}
+          {loading && (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>{t('scanner_verifying')}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING.xxl }]}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.cancelText}>{t('cancel')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 }
 
-// Stylesheet for the scanner UI
+// --- STYLES ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
+
+  // Permission / no-device state (cream background, as on the other screens)
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.xxl,
+    backgroundColor: COLORS.background,
   },
+  stateIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: SIZES.radiusFull,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  stateTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textMain,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  stateText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.textSub,
+    textAlign: 'center',
+    marginBottom: SPACING.xxl,
+  },
+  stateButton: {
+    width: '100%',
+    marginBottom: SPACING.md,
+  },
+
+  // Camera overlay
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+  },
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: SIZES.radiusFull,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonPlaceholder: {
+    width: 42,
+  },
+  topTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: COLORS.white,
+    fontSize: 17,
+    fontWeight: '800',
+    marginHorizontal: SPACING.sm,
+  },
+  middle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hint: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.xxl,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
   },
   scanArea: {
     width: 260,
     height: 260,
     borderWidth: 3,
-    borderColor: '#00FF00',
+    borderColor: COLORS.white,
     backgroundColor: 'transparent',
-    borderRadius: 12,
+    borderRadius: SIZES.radiusLg,
   },
   loadingBox: {
     position: 'absolute',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xxl,
+    borderRadius: SIZES.radiusMd,
   },
   loadingText: {
-    color: '#00FF00',
-    marginTop: 10,
-    fontWeight: 'bold',
+    color: COLORS.textMain,
+    marginTop: SPACING.md,
+    fontWeight: '700',
+  },
+  bottomBar: {
+    alignItems: 'center',
+    paddingTop: SPACING.lg,
   },
   cancelButton: {
-    position: 'absolute',
-    bottom: 50,
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
+    minWidth: 160,
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: SPACING.xxxl,
+    paddingVertical: 14,
+    borderRadius: SIZES.radiusMd,
   },
   cancelText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  }
+    color: COLORS.textMain,
+    fontWeight: '800',
+    fontSize: 15,
+  },
 });

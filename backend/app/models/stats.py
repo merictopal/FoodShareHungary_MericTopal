@@ -28,7 +28,8 @@ class Leaderboard(db.Model):
     __table_args__ = {'extend_existing': True}
 
     id = db.Column(db.Integer, primary_key=True)
-    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant_profiles.id'), nullable=False)
+    # One row per restaurant (DB constraint leaderboard_restaurant_id_key, see migrations/)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant_profiles.id'), nullable=False, unique=True)
     points = db.Column(db.Integer, default=0)
     meals_shared = db.Column(db.Integer, default=0)
 

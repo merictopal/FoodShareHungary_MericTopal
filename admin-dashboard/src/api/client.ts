@@ -7,6 +7,17 @@ export const client = axios.create({
   },
 });
 
+// --- ADMIN SESSION ---
+const ADMIN_TOKEN_KEYS = ['admin_token', 'admin_refresh_token'];
+
+// Removes every stored admin credential (used by Log Out and when a refresh fails).
+export const clearAdminSession = () => {
+  ADMIN_TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
+  delete client.defaults.headers.common['Authorization'];
+};
+
+export const hasAdminSession = () => Boolean(localStorage.getItem('admin_token'));
+
 // --- REQUEST INTERCEPTOR ---
 client.interceptors.request.use(
   (config) => {
@@ -39,14 +50,18 @@ client.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // A 401 from the login endpoint means wrong credentials, not an expired session.
+    if (originalRequest?.url === '/auth/login') {
+      return Promise.reject(error);
+    }
+
     // If error is 401 and we haven't already tried to refresh this specific request
     if (error.response?.status === 401 && !originalRequest._retry) {
       
       // If the request that failed WAS the refresh request, then the refresh token is also dead.
       // Time to actually log the user out.
       if (originalRequest.url === '/auth/refresh') {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_refresh_token');
+        clearAdminSession();
         if (window.location.pathname !== '/') window.location.href = '/';
         return Promise.reject(error);
       }
@@ -70,7 +85,8 @@ client.interceptors.response.use(
       
       if (!refreshToken) {
          // No backup key? Kick them out.
-         localStorage.removeItem('admin_token');
+         isRefreshing = false;
+         clearAdminSession();
          if (window.location.pathname !== '/') window.location.href = '/';
          return Promise.reject(error);
       }
@@ -97,8 +113,7 @@ client.interceptors.response.use(
       } catch (err) {
         // Refresh token failed or expired. Nuke everything.
         processQueue(err, null);
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_refresh_token');
+        clearAdminSession();
         if (window.location.pathname !== '/') window.location.href = '/';
         return Promise.reject(err);
       } finally {

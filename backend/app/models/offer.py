@@ -32,7 +32,8 @@ class Offer(db.Model):
             'quantity_left': self.quantity,
             'original_quantity': self.original_quantity,
             'status': self.status,
-            'pickup_window': f"{self.pickup_start} - {self.pickup_end}" if self.pickup_start else "Gün Boyu",
+            # No pickup times are stored (same-day offers, see docs/claims.md); null instead of a hard-coded label
+            'pickup_window': f"{self.pickup_start} - {self.pickup_end}" if self.pickup_start else None,
             'image_url': self.image_url,
             'location': {'lat': self.restaurant.lat if self.restaurant else 0.0, 'lng': self.restaurant.lng if self.restaurant else 0.0},
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
@@ -40,7 +41,11 @@ class Offer(db.Model):
 
 class Claim(db.Model):
     __tablename__ = 'claims'
-    __table_args__ = {'extend_existing': True}
+    # One claim per student per offer (DB constraint claims_user_offer_key, see migrations/)
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'offer_id', name='claims_user_offer_key'),
+        {'extend_existing': True},
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

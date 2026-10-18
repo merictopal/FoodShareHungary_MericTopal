@@ -24,3 +24,5 @@ node_modules/
 .vscode/
 .idea/
 .DS_Store
+# Private verification documents (local development fallback)
+private_uploads/

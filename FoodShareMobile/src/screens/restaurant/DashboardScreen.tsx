@@ -12,18 +12,24 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  PermissionsAndroid
 } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { offersApi } from '../../api/offers';
 import { client } from '../../api/client';
-import { COLORS, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { LeaderboardModal } from '../../components/LeaderboardModal';
+import { OfferTypeBadge } from '../../components/OfferTypeBadge';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { toLangUpper } from '../../utils/text';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
+import { apiErrorKey, verifySuccessMessage } from '../../utils/apiErrors';
 
 const DashboardScreen = () => {
   const { user, logout, t, changeLanguage, lang, updateUser } = useAuth();
@@ -31,6 +37,9 @@ const DashboardScreen = () => {
 
   const [activeTab, setActiveTab] = useState<'free' | 'discount'>('free');
   const [qrCode, setQrCode] = useState('');
+  // Inline field errors as translation keys (translated at render, so a language switch updates them)
+  const [qrError, setQrError] = useState('');
+  const [titleError, setTitleError] = useState('');
   const [title, setTitle] = useState('');
   const [qty, setQty] = useState('1');
   const [discount, setDiscount] = useState('');
@@ -59,21 +68,78 @@ const DashboardScreen = () => {
     }
   };
 
+  // Restaurant location (lat/lng stored on the backend; the PostGIS point is derived from them)
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+
+  // Accept a response as a location only if both coordinates are finite numbers: the location card
+  // calls toFixed on them, so a 2xx body without numeric lat/lng must leave the state null instead.
+  const toLocation = (data: any): { lat: number; lng: number } | null =>
+    Number.isFinite(data?.lat) && Number.isFinite(data?.lng) ? { lat: data.lat, lng: data.lng } : null;
+
+  const fetchLocation = async () => {
+    try {
+      const res = await client.get('/restaurant/location');
+      const loc = toLocation(res.data);
+      if (!loc) console.warn('fetchLocation: response without numeric lat/lng');
+      setLocation(loc);
+    } catch (e) {
+      console.warn('fetchLocation failed:', e);
+    }
+  };
+
+  // Saves the device's current GPS position as the restaurant location
+  const handleUseCurrentLocation = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert(t('error'), t('location_permission_required'));
+        return;
+      }
+    }
+    setSavingLocation(true);
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await client.put('/restaurant/location', { lat: latitude, lng: longitude });
+          const loc = toLocation(res.data);
+          if (!loc) {
+            Alert.alert(t('error'), t('location_save_failed'));
+            return;
+          }
+          setLocation(loc);
+          Alert.alert(t('success'), t('location_updated'));
+        } catch (e: any) {
+          Alert.alert(t('error'), t(apiErrorKey(e, 'location_save_failed')));
+        } finally {
+          setSavingLocation(false);
+        }
+      },
+      () => {
+        setSavingLocation(false);
+        Alert.alert(t('error'), t('location_read_failed'));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
   // Refresh the offers list every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       fetchMyOffers();
+      fetchLocation();
     }, [user?.id])
   );
 
   const handleDeleteOffer = async (offerId: number) => {
     Alert.alert(
-      t('delete_offer') || 'Remove Offer',
-      t('delete_offer_confirm') || 'Are you sure you want to remove this offer?',
+      t('delete_offer'),
+      t('confirm_delete_offer'),
       [
         { text: t('cancel'), style: 'cancel' },
         {
-          text: t('delete') || 'Remove',
+          text: t('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -81,7 +147,7 @@ const DashboardScreen = () => {
               // Optimistically remove from local state without a full refetch
               setMyOffers(prev => prev.filter(o => o.id !== offerId));
             } catch (e) {
-              Alert.alert(t('error'), 'Could not remove offer.');
+              Alert.alert(t('error'), t('offer_delete_failed'));
             }
           }
         }
@@ -98,7 +164,7 @@ const DashboardScreen = () => {
         {
           text: t('camera') || 'Take Photo',
           onPress: () => {
-            launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
+            launchCamera({ mediaType: 'photo', quality: 0.8, maxWidth: 1280, maxHeight: 1280 }, (response) => {
               if (response.assets && response.assets.length > 0) {
                 setPhoto(response.assets[0]);
               }
@@ -108,7 +174,7 @@ const DashboardScreen = () => {
         {
           text: t('gallery') || 'Choose from Gallery',
           onPress: () => {
-            launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+            launchImageLibrary({ mediaType: 'photo', quality: 0.8, maxWidth: 1280, maxHeight: 1280 }, (response) => {
               if (response.assets && response.assets.length > 0) {
                 setPhoto(response.assets[0]);
               }
@@ -125,7 +191,7 @@ const DashboardScreen = () => {
       {
         text: t('camera') || 'Camera',
         onPress: () => {
-          launchCamera({ mediaType: 'photo', quality: 0.5 }, (res) => {
+          launchCamera({ mediaType: 'photo', quality: 0.5, maxWidth: 512, maxHeight: 512 }, (res) => {
             if (res.assets?.length) uploadAvatar(res.assets[0]);
           });
         }
@@ -133,7 +199,7 @@ const DashboardScreen = () => {
       {
         text: t('gallery') || 'Gallery',
         onPress: () => {
-          launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (res) => {
+          launchImageLibrary({ mediaType: 'photo', quality: 0.5, maxWidth: 512, maxHeight: 512 }, (res) => {
             if (res.assets?.length) uploadAvatar(res.assets[0]);
           });
         }
@@ -161,10 +227,10 @@ const DashboardScreen = () => {
 
       if (response.data.success) {
         updateUser({ ...user, avatar_url: response.data.url });
-        Alert.alert(t('success') || 'Success', 'Profile picture updated!');
+        Alert.alert(t('success'), t('avatar_updated'));
       }
     } catch (error) {
-      Alert.alert(t('error') || 'Error', 'Failed to upload profile picture.');
+      Alert.alert(t('error'), t('avatar_upload_failed'));
     } finally {
       setUploadingAvatar(false);
     }
@@ -172,20 +238,21 @@ const DashboardScreen = () => {
 
   const handleVerify = async () => {
     if (!qrCode.trim()) {
-      Alert.alert(t('error'), 'Invalid code.');
+      setQrError('invalid_code');
       return;
     }
+    setQrError('');
 
     setLoading(true);
     Keyboard.dismiss();
 
     try {
       const res = await offersApi.verifyQr(qrCode.trim());
-      Alert.alert(t('success'), `+${res.data?.points || 10} ${t('saved')}!`);
+      // The backend reports the actual XP/points (e.g. "+50 XP … +20 Points"); same as the scanner screen
+      Alert.alert(t('success'), verifySuccessMessage(res.data, t));
       setQrCode('');
     } catch (e: any) {
-      const errorMsg = e.response?.data?.message || t('error');
-      Alert.alert(t('error'), errorMsg);
+      Alert.alert(t('error'), t(apiErrorKey(e, 'generic_error')));
     } finally {
       setLoading(false);
     }
@@ -193,7 +260,20 @@ const DashboardScreen = () => {
 
   const handleCreate = async () => {
     if (!title.trim()) {
-      Alert.alert(t('error'), 'Missing information.');
+      setTitleError('field_required');
+      return;
+    }
+    setTitleError('');
+
+    // Same rules as the backend (quantity >= 1, discount 0-100), checked here so the user gets a translated message
+    const parsedQty = parseInt(qty, 10);
+    if (qty.trim() !== '' && !(parsedQty >= 1)) {
+      Alert.alert(t('error'), t('err_check_input'));
+      return;
+    }
+    const parsedDiscount = parseInt(discount, 10);
+    if (activeTab === 'discount' && discount.trim() !== '' && !(parsedDiscount >= 0 && parsedDiscount <= 100)) {
+      Alert.alert(t('error'), t('discount_range'));
       return;
     }
 
@@ -213,13 +293,19 @@ const DashboardScreen = () => {
         discount_rate: discountValue
       };
 
+      // A failed photo upload after the offer was created still counts as published (no retry/duplicate)
+      let photoUploadFailed = false;
       if (photo) {
-        await offersApi.createWithImage(offerData, photo);
+        const result = await offersApi.createWithImage(offerData, photo);
+        photoUploadFailed = Boolean((result as any).photoUploadFailed);
       } else {
         await offersApi.create(offerData);
       }
 
-      Alert.alert(t('success'), t('msg_offer_published'));
+      Alert.alert(
+        t('success'),
+        t(photoUploadFailed ? 'msg_offer_published_photo_failed' : 'msg_offer_published')
+      );
 
       // Reset the form fields
       setTitle('');
@@ -232,8 +318,7 @@ const DashboardScreen = () => {
       fetchMyOffers();
 
     } catch (e: any) {
-      const errorMsg = e.response?.data?.message || t('error');
-      Alert.alert(t('error'), errorMsg);
+      Alert.alert(t('error'), t(apiErrorKey(e, 'generic_error')));
     } finally {
       setLoading(false);
     }
@@ -269,7 +354,7 @@ const DashboardScreen = () => {
 
         {isModal && (
           <TouchableOpacity style={styles.editAvatarBtn} onPress={handleEditAvatar} activeOpacity={0.7}>
-            <Text style={styles.editAvatarText}>✎</Text>
+            <Ionicons name="pencil" size={14} color={COLORS.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -303,7 +388,8 @@ const DashboardScreen = () => {
             onPress={() => setIsLeaderboardVisible(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.leaderboardBtnText}>🏆 {t('leaderboard') || 'Rankings'}</Text>
+            <Ionicons name="trophy-outline" size={14} color="#B7791F" />
+            <Text style={styles.leaderboardBtnText}>{t('leaderboard')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -312,29 +398,60 @@ const DashboardScreen = () => {
           <Text style={styles.cardTitle}>{t('verify_qr')}</Text>
           <Text style={styles.cardDescription}>{t('desc_verify_qr')}</Text>
 
-          <View style={styles.row}>
+          <Button
+            title={t('scan_qr_btn')}
+            onPress={() => navigation.navigate('Scanner')}
+            icon={<Ionicons name="scan-outline" size={20} color={COLORS.white} />}
+          />
+
+          <View style={styles.manualEntryRow}>
             <View style={styles.inputFlex}>
               <Input
                 placeholder={t('qr_ph')}
                 value={qrCode}
-                onChangeText={setQrCode}
+                onChangeText={(text) => {
+                  setQrCode(text);
+                  if (qrError) setQrError('');
+                }}
                 autoCapitalize="characters"
+                error={qrError ? t(qrError) : undefined}
+                style={styles.manualEntryInput}
               />
             </View>
-            <Button
-              title="Scan QR"
-              onPress={() => navigation.navigate('Scanner')}
-              style={styles.scanBtn}
-              textStyle={styles.scanBtnText}
-            />
             <Button
               title={t('verify_btn')}
               onPress={handleVerify}
               loading={loading}
+              variant="outline"
               style={styles.verifyBtn}
               textStyle={styles.verifyBtnText}
             />
           </View>
+        </View>
+
+        {/* Restaurant Location Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('restaurant_location_title')}</Text>
+          <Text style={styles.cardDescription}>{t('location_card_desc')}</Text>
+
+          <View style={styles.locationRow}>
+            <View style={styles.locationIcon}>
+              <Ionicons name="location-outline" size={18} color={COLORS.primary} />
+            </View>
+            <Text style={styles.locationText}>
+              {location
+                ? `Lat ${location.lat.toFixed(5)}, Lng ${location.lng.toFixed(5)}`
+                : t('location_not_loaded')}
+            </Text>
+          </View>
+
+          <Button
+            title={t('use_current_location')}
+            onPress={handleUseCurrentLocation}
+            loading={savingLocation}
+            variant="outline"
+            icon={<Ionicons name="locate-outline" size={18} color={COLORS.primary} />}
+          />
         </View>
 
         {/* Add New Offer Card */}
@@ -367,8 +484,12 @@ const DashboardScreen = () => {
           <Input
             label={t('prod_name_ph')}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(text) => {
+              setTitle(text);
+              if (titleError) setTitleError('');
+            }}
             placeholder={t('ph_offer_name')}
+            error={titleError ? t(titleError) : undefined}
           />
 
           <View style={styles.row}>
@@ -407,7 +528,8 @@ const DashboardScreen = () => {
               </View>
             ) : (
               <TouchableOpacity onPress={handleSelectImage} style={styles.addPhotoBtn}>
-                <Text style={styles.addPhotoBtnText}>📸 {t('add_photo') || '+ Add Meal Photo'}</Text>
+                <Ionicons name="camera-outline" size={18} color={COLORS.textSub} />
+                <Text style={styles.addPhotoBtnText}>{t('add_photo')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -422,14 +544,14 @@ const DashboardScreen = () => {
         {/* Active Offers List Card */}
         <View style={styles.card}>
           <View style={styles.myOffersHeader}>
-            <Text style={styles.cardTitle}>{t('my_offers') || 'My Active Offers'}</Text>
+            <Text style={styles.cardTitle}>{t('my_offers')}</Text>
             <TouchableOpacity onPress={fetchMyOffers} activeOpacity={0.7}>
-              <Text style={styles.refreshBtn}>{t('refresh') || '↻ Refresh'}</Text>
+              <Text style={styles.refreshBtn}>{t('refresh')}</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.cardDescription}>
-            {t('desc_my_offers') || 'Your currently active listings. Tap × to remove one.'}
+            {t('desc_my_offers')}
           </Text>
 
           {loadingOffers ? (
@@ -437,38 +559,33 @@ const DashboardScreen = () => {
           ) : myOffers.length === 0 ? (
             <View style={styles.emptyOffersBox}>
               <Text style={styles.emptyOffersText}>
-                {t('no_active_offers') || '🍽️ No active offers yet. Add one above!'}
+                {t('no_active_offers')}
               </Text>
             </View>
           ) : (
             myOffers.map(offer => (
               <View key={offer.id} style={styles.myOfferRow}>
-                <View style={[
-                  styles.myOfferTypeBadge,
-                  { backgroundColor: offer.type === 'free' ? '#E1F7E9' : '#FFF3E0' }
-                ]}>
-                  <Text style={{
-                    fontSize: 10,
-                    fontWeight: '800',
-                    color: offer.type === 'free' ? COLORS.success : COLORS.warning
-                  }}>
-                    {offer.type === 'free' ? (t('free') || 'FREE') : `-%${offer.discount_rate}`}
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.myOfferInfo}>
                   <Text style={styles.myOfferTitle} numberOfLines={1}>{offer.title}</Text>
-                  <Text style={styles.myOfferStock}>
-                    🔥 {offer.quantity_left} {t('left') || 'left'}
-                  </Text>
+                  <View style={styles.myOfferMetaRow}>
+                    <OfferTypeBadge type={offer.type} discountRate={offer.discount_rate} />
+                    <View style={styles.myOfferStockRow}>
+                      <Ionicons name="flame-outline" size={13} color={COLORS.textMuted} />
+                      <Text style={styles.myOfferStock}>
+                        {offer.quantity_left} {t('left')}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
                 <TouchableOpacity
                   onPress={() => handleDeleteOffer(offer.id)}
                   style={styles.myOfferDeleteBtn}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('delete_offer')}
                 >
-                  <Text style={styles.myOfferDeleteText}>✕</Text>
+                  <Ionicons name="close" size={16} color={COLORS.danger} />
                 </TouchableOpacity>
               </View>
             ))
@@ -504,10 +621,10 @@ const DashboardScreen = () => {
                 <View style={styles.profileInfoBox}>
                   {renderAvatar(true)}
                   <Text style={styles.profileName}>{user?.name}</Text>
-                  <Text style={styles.profileRole}>{t('role_rest')}</Text>
+                  <Text style={styles.profileRole}>{toLangUpper(t('role_rest'), lang)}</Text>
                 </View>
 
-                <Text style={styles.sectionLabel}>{t('lang_change')}</Text>
+                <Text style={styles.sectionLabel}>{toLangUpper(t('lang_change'), lang)}</Text>
                 <View style={styles.langContainer}>
                   {['tr', 'en', 'hu'].map((l) => (
                     <TouchableOpacity
@@ -546,390 +663,702 @@ const DashboardScreen = () => {
 };
 
 const styles = StyleSheet.create({
+
+  // =====================================================
+  // SCREEN
+  // =====================================================
+
   container: {
     flex: 1,
-    backgroundColor: COLORS.background
+    backgroundColor: COLORS.background,
   },
+
   scrollContent: {
-    padding: 24
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
+
+  // =====================================================
+  // HEADER / AVATAR
+  // =====================================================
+
   headerAvatarContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+
     backgroundColor: COLORS.primary,
+
     justifyContent: 'center',
     alignItems: 'center',
+
+    overflow: 'hidden',
+
     ...SHADOWS.light,
   },
+
   headerAvatarText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '800',
   },
+
   headerAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
+    borderRadius: 19,
   },
-  modalAvatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    ...SHADOWS.medium,
-  },
-  modalAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-  },
-  modalAvatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 40,
-  },
-  editAvatarBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: -4,
-    backgroundColor: '#FFFFFF',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.light,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  editAvatarText: {
-    fontSize: 14,
-    color: COLORS.primary,
-  },
+
+  // =====================================================
+  // WELCOME
+  // =====================================================
+
   welcomeSection: {
-    marginBottom: 28,
-    marginLeft: 4
+    marginBottom: 24,
+    marginHorizontal: 2,
   },
+
   welcomeSub: {
-    fontSize: 15,
+    fontSize: 13,
     color: COLORS.textSub,
     fontWeight: '500',
-    marginBottom: 4
+    marginBottom: 3,
   },
+
   welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '900',
+    fontSize: 26,
+    fontWeight: '800',
     color: COLORS.textMain,
-    letterSpacing: -0.5
+    letterSpacing: -0.5,
   },
+
   leaderboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
     backgroundColor: '#FFFBEB',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+
+    borderRadius: SIZES.radiusFull,
+
     borderWidth: 1,
-    borderColor: '#FEF08A',
+    borderColor: '#FDE68A',
+
     ...SHADOWS.light,
   },
+
   leaderboardBtnText: {
-    color: '#CA8A04',
+    marginLeft: 5,
+    color: '#B7791F',
+    fontSize: 11,
     fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
+
+  // =====================================================
+  // GENERAL CARDS
+  // =====================================================
+
   card: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    borderRadius: 20,
-    marginBottom: 24,
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusLg,
+
+    padding: 20,
+
+    marginBottom: 16,
+
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    ...SHADOWS.medium
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
   },
+
   cardTitle: {
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 8,
+
     color: COLORS.textMain,
-    letterSpacing: 0.2
+
+    marginBottom: 6,
+
+    letterSpacing: -0.2,
   },
+
   cardDescription: {
     fontSize: 13,
+
     color: COLORS.textSub,
-    marginBottom: 20,
-    lineHeight: 20,
+
+    lineHeight: 19,
+
+    marginBottom: 18,
   },
+
+  // =====================================================
+  // ROWS / INPUT AREAS
+  // =====================================================
+
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
   },
+
   inputFlex: {
-    flex: 1
+    flex: 1,
+    minWidth: 0,
   },
-  scanBtn: {
-    marginLeft: 8,
-    height: 56,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: COLORS.secondary,
+
+  manualEntryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 16,
   },
-  scanBtnText: {
-    fontSize: 12,
+
+  manualEntryInput: {
+    marginBottom: 0,
   },
+
   verifyBtn: {
+    height: 54,
+
     marginLeft: 8,
-    height: 56,
+
     paddingHorizontal: 16,
-    borderRadius: 12,
+
+    borderRadius: SIZES.radiusMd,
   },
+
   verifyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    padding: 12,
+    marginBottom: 16,
+
+    backgroundColor: COLORS.surfaceSecondary,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  locationIcon: {
+    width: 34,
+    height: 34,
+
+    marginRight: 10,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: SIZES.radiusFull,
+  },
+
+  locationText: {
+    flex: 1,
     fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMain,
   },
+
   publishSpacing: {
-    height: 10
+    height: 4,
   },
+
+  // =====================================================
+  // FREE / DISCOUNT SELECTOR
+  // =====================================================
+
   sliderContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EAECEF',
-    borderRadius: 14,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radius,
+
     padding: 4,
-    marginBottom: 24
+
+    marginBottom: 20,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+
   sliderBtn: {
     flex: 1,
-    paddingVertical: 12,
+
     alignItems: 'center',
-    borderRadius: 10
+    justifyContent: 'center',
+
+    paddingVertical: 11,
+
+    borderRadius: SIZES.radiusSm,
   },
+
   sliderBtnActive: {
-    backgroundColor: '#FFFFFF',
-    ...SHADOWS.light
+    backgroundColor: COLORS.surface,
+
+    ...SHADOWS.light,
   },
+
   sliderText: {
-    fontWeight: '700',
-    color: COLORS.textSub,
-    fontSize: 13
+    fontSize: 13,
+
+    fontWeight: '600',
+
+    color: COLORS.textMuted,
   },
+
   sliderTextActive: {
     color: COLORS.primary,
-    fontWeight: '800'
+
+    fontWeight: '800',
   },
+
+  // =====================================================
+  // PHOTO PICKER
+  // =====================================================
+
   imagePickerContainer: {
-    marginBottom: 20,
+    marginBottom: 18,
+
     alignItems: 'center',
   },
+
   addPhotoBtn: {
     width: '100%',
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+
+    flexDirection: 'row',
+    gap: 8,
+
+    minHeight: 64,
+
+    paddingHorizontal: 16,
+
+    borderWidth: 1.5,
+    borderColor: COLORS.borderStrong,
+
     borderStyle: 'dashed',
-    borderRadius: 14,
-    backgroundColor: '#F9FAFB',
+
+    borderRadius: SIZES.radius,
+
+    backgroundColor: COLORS.surfaceSecondary,
+
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   addPhotoBtnText: {
     color: COLORS.textSub,
-    fontSize: 14,
+
+    fontSize: 13,
+
     fontWeight: '700',
   },
+
   previewContainer: {
     width: '100%',
+
     alignItems: 'center',
   },
+
   previewImage: {
     width: '100%',
+
     height: 180,
-    borderRadius: 14,
-    marginBottom: 12,
+
+    borderRadius: SIZES.radiusMd,
+
+    marginBottom: 10,
   },
+
   changePhotoBtn: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radiusSm,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+
   changePhotoText: {
     color: COLORS.textMain,
-    fontSize: 13,
-    fontWeight: '600',
+
+    fontSize: 12,
+
+    fontWeight: '700',
   },
-  // --- Active Offers Section ---
+
+  // =====================================================
+  // ACTIVE OFFERS
+  // =====================================================
+
   myOffersHeader: {
     flexDirection: 'row',
+
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+
+    marginBottom: 6,
   },
+
   refreshBtn: {
-    fontSize: 13,
+    fontSize: 12,
+
     color: COLORS.primary,
-    fontWeight: '700',
+
+    fontWeight: '800',
   },
+
   emptyOffersBox: {
-    paddingVertical: 24,
+    paddingVertical: 22,
+
+    paddingHorizontal: 16,
+
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+
+    backgroundColor: COLORS.surfaceSecondary,
+
+    borderRadius: SIZES.radius,
+
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: COLORS.border,
   },
+
   emptyOffersText: {
-    fontSize: 14,
+    fontSize: 13,
+
     color: COLORS.textSub,
-    fontWeight: '600',
+
+    fontWeight: '500',
+
+    textAlign: 'center',
   },
+
   myOfferRow: {
     flexDirection: 'row',
+
     alignItems: 'center',
-    paddingVertical: 14,
+
+    minHeight: 68,
+
+    paddingVertical: 12,
+
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.divider,
   },
-  myOfferTypeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    minWidth: 50,
+
+  myOfferInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+
+  myOfferMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    columnGap: 10,
+    rowGap: 4,
+    marginTop: 6,
   },
+
   myOfferTitle: {
     fontSize: 14,
+
     fontWeight: '700',
+
     color: COLORS.textMain,
   },
-  myOfferStock: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    marginTop: 2,
-  },
-  myOfferDeleteBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FEF2F2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-  },
-  myOfferDeleteText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.danger,
-  },
-  // --- Settings Modal ---
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(31, 41, 51, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    ...SHADOWS.heavy,
-  },
-  modalHeader: {
+
+  myOfferStockRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.textMain,
+
+  myOfferStock: {
+    fontSize: 11,
+
+    color: COLORS.textMuted,
+
+    marginLeft: 4,
+
+    fontWeight: '600',
   },
-  closeBtn: {
+
+  myOfferDeleteBtn: {
     width: 32,
     height: 32,
-    backgroundColor: '#F7F7F8',
-    borderRadius: 16,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.dangerLight,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: '#F6C9C4',
+  },
+
+  // =====================================================
+  // SETTINGS MODAL
+  // =====================================================
+
+  modalOverlay: {
+    flex: 1,
+
+    backgroundColor: COLORS.overlay,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    padding: 20,
+  },
+
+  modalContent: {
+    width: '100%',
+
+    maxWidth: 420,
+
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusXl,
+
+    padding: 24,
+
+    ...SHADOWS.heavy,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+    alignItems: 'center',
+
+    marginBottom: 20,
+  },
+
+  modalTitle: {
+    fontSize: 21,
+
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    letterSpacing: -0.3,
+  },
+
+  closeBtn: {
+    width: 34,
+    height: 34,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.surfaceMuted,
+
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   closeBtnText: {
-    fontSize: 16,
+    fontSize: 15,
+
     fontWeight: '800',
+
     color: COLORS.textSub,
-    marginTop: -2,
   },
+
+  // =====================================================
+  // MODAL PROFILE
+  // =====================================================
+
   profileInfoBox: {
     alignItems: 'center',
-    marginBottom: 30,
+
     paddingBottom: 20,
+
+    marginBottom: 22,
+
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.divider,
   },
+
+  modalAvatarContainer: {
+    width: 76,
+    height: 76,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.primary,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginBottom: 10,
+
+    overflow: 'hidden',
+
+    ...SHADOWS.medium,
+  },
+
+  modalAvatarText: {
+    color: COLORS.white,
+
+    fontSize: 30,
+
+    fontWeight: '800',
+  },
+
+  modalAvatarImage: {
+    width: '100%',
+    height: '100%',
+
+    borderRadius: SIZES.radiusFull,
+  },
+
+  editAvatarBtn: {
+    position: 'absolute',
+
+    bottom: 0,
+    right: -2,
+
+    width: 28,
+    height: 28,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.surface,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
   profileName: {
-    fontSize: 22,
+    fontSize: 21,
+
     fontWeight: '800',
+
     color: COLORS.textMain,
-    marginTop: 12,
-  },
-  profileRole: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primary,
+
     marginTop: 4,
-    letterSpacing: 1,
   },
-  sectionLabel: {
-    fontSize: 12,
+
+  profileRole: {
+    fontSize: 11,
+
     fontWeight: '800',
-    color: COLORS.textSub,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+
+    color: COLORS.primary,
+
+    marginTop: 4,
+
+    letterSpacing: 0.8,
   },
+
+  // =====================================================
+  // LANGUAGE
+  // =====================================================
+
+  sectionLabel: {
+    fontSize: 11,
+
+    fontWeight: '800',
+
+    color: COLORS.textMuted,
+
+    marginBottom: 10,
+
+    letterSpacing: 0.6,
+  },
+
   langContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F7F7F8',
+
+    backgroundColor: COLORS.surfaceMuted,
+
     padding: 4,
-    borderRadius: 12,
-    marginBottom: 30,
+
+    borderRadius: SIZES.radius,
+
+    marginBottom: 24,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+
   langBtn: {
     flex: 1,
+
     paddingVertical: 10,
+
     alignItems: 'center',
-    borderRadius: 8,
+
+    borderRadius: SIZES.radiusSm,
   },
+
   langBtnActive: {
-    backgroundColor: '#FFFFFF',
-    ...SHADOWS.light
+    backgroundColor: COLORS.surface,
+
+    ...SHADOWS.light,
   },
+
   langText: {
-    fontSize: 13,
+    fontSize: 12,
+
     fontWeight: '700',
-    color: COLORS.textSub
+
+    color: COLORS.textMuted,
   },
+
   langTextActive: {
-    color: COLORS.textMain
+    color: COLORS.primary,
+
+    fontWeight: '800',
   },
+
+  // =====================================================
+  // LOGOUT
+  // =====================================================
+
   logoutBtn: {
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.dangerLight,
+
+    paddingVertical: 14,
+
+    borderRadius: SIZES.radius,
+
     alignItems: 'center',
+
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: '#F6C9C4',
   },
+
   logoutBtnText: {
     color: COLORS.danger,
-    fontSize: 15,
+
+    fontSize: 14,
+
     fontWeight: '800',
-    letterSpacing: 0.5,
-  }
+
+    letterSpacing: 0.4,
+  },
 });
 
 export default DashboardScreen;

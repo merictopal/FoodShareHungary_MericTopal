@@ -4,7 +4,7 @@ import {
   ShieldAlert, Calendar, Globe, User, LayoutDashboard, 
   Users, Store, UtensilsCrossed, FileText, LogOut 
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 
 interface LogEntry {
   id: number;
@@ -35,7 +35,8 @@ export default function AuditLogs() {
   }, []);
 
   const handleLogout = () => {
-    navigate('/'); 
+    clearAdminSession();
+    navigate('/', { replace: true });
   };
 
   return (

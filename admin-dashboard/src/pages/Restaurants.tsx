@@ -5,7 +5,7 @@ import {
   LogOut, FileText, Search, Activity, Ban, X,
   ChevronUp, ChevronDown, ChevronsUpDown, MoreVertical
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 
 interface SystemUser {
   id: number;
@@ -60,7 +60,10 @@ export default function Restaurants() {
     fetchRestaurants();
   }, []);
 
-  const handleLogout = () => navigate('/');
+  const handleLogout = () => {
+    clearAdminSession();
+    navigate('/', { replace: true });
+  };
 
   const handleSuspend = async (userId: number, userName: string) => {
     setOpenDropdownId(null);

@@ -1,0 +1,30 @@
+# Repository-wide safety net. Package-level rules live in backend/, FoodShareMobile/ and admin-dashboard/.
+
+# --- Secrets / local configuration ---
+.env
+.env.*
+!.env.example
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-service-account*.json
+**/*service-account*.json
+
+# --- Local upload fallback when S3 is not configured (documents and public images) ---
+**/private_uploads/
+backend/app/static/uploads/
+
+# --- Thesis test evidence (contains DB snapshots with real personal data) ---
+thesis_evidence/
+**/db_before*.txt
+
+# --- Generated caches ---
+.pytest_cache/
+backend/.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# --- Personal / agent tooling (not part of the project source) ---
+.claude/settings.local.json
+.agents/
+.codex/
+AGENTS.md

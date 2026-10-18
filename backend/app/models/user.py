@@ -2,6 +2,8 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
 from geoalchemy2 import Geometry
+from geoalchemy2.elements import WKTElement
+from sqlalchemy import event
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -30,6 +32,8 @@ class User(db.Model):
     verification_status = db.Column(db.String(20), default='unverified')
     
     id_document_url = db.Column(db.String(500), nullable=True)
+    # Kind of verification document (column already exists in the DB): student | pensioner | social
+    document_type = db.Column(db.String(50), nullable=True)
     avatar_url = db.Column(db.String(500), nullable=True) 
     
     # --- GAMIFICATION ENGINE ---
@@ -38,7 +42,13 @@ class User(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     fcm_token = db.Column(db.String(255), nullable=True)
-    
+
+    # --- PASSWORD RESET (migrations/2026-10-02_users_password_reset.sql) ---
+    # Only a hash of the e-mailed code is stored; never serialized in to_dict()
+    reset_code_hash = db.Column(db.String(255), nullable=True)
+    reset_code_expires_at = db.Column(db.DateTime, nullable=True)
+    reset_code_attempts = db.Column(db.Integer, default=0, nullable=False)
+
     # Clean, single-source-of-truth relationships with fully qualified paths
     restaurant_profile = db.relationship('app.models.user.RestaurantProfile', backref='owner', uselist=False, cascade="all, delete-orphan")
     claims = db.relationship('app.models.offer.Claim', backref='student', lazy='dynamic')
@@ -120,6 +130,16 @@ class RestaurantProfile(db.Model):
             'lng': self.lng
         }
     
+@event.listens_for(RestaurantProfile, 'before_insert')
+@event.listens_for(RestaurantProfile, 'before_update')
+def _sync_restaurant_geom(mapper, connection, target):
+    """Keeps the PostGIS point (SRID 4326, x = longitude, y = latitude) in sync with lat/lng on every write."""
+    if target.lat is not None and target.lng is not None:
+        target.geom = WKTElement(f'POINT({float(target.lng)} {float(target.lat)})', srid=4326)
+    else:
+        target.geom = None
+
+
 # --- AUDIT LOG (ENTERPRISE SECURITY) ---
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'

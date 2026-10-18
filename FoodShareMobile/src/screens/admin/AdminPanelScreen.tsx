@@ -3,7 +3,9 @@ import {
   View, Text, StyleSheet, ScrollView, RefreshControl, 
   TouchableOpacity, ActivityIndicator, Alert, FlatList, Modal, Image 
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
+import { toLangUpper } from '../../utils/text';
 import { client } from '../../api/client';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { Header } from '../../components/Header';
@@ -86,29 +88,29 @@ const AdminPanelScreen = () => {
   const handleApprove = async (userId: number, name: string) => {
     try {
       await client.post('/admin/approve', { user_id: userId });
-      Alert.alert(t('success') || 'Success', `${name} has been approved.`);
+      Alert.alert(t('success'), t('user_approved', { name }));
       fetchDashboardData(); // Refresh lists after approval
     } catch (error) {
-      Alert.alert(t('error') || 'Error', "Approval operation failed.");
+      Alert.alert(t('error'), t('approve_failed'));
     }
   };
   
   const handleReject = async (userId: number, name: string) => {
     Alert.alert(
-      "Reject Document",
-      `Are you sure you want to reject ${name}'s document? They will need to upload it again.`,
+      t('reject_doc_title'),
+      t('reject_doc_msg', { name }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('cancel'), style: "cancel" },
         { 
-          text: "Reject", 
+          text: t('reject'), 
           style: "destructive",
           onPress: async () => {
             try {
               await client.post('/admin/reject', { user_id: userId });
-              Alert.alert('Rejected', `${name} has been rejected.`);
+              Alert.alert(t('rejected'), t('user_rejected', { name }));
               fetchDashboardData(); 
             } catch (error) {
-              Alert.alert('Error', "Rejection operation failed.");
+              Alert.alert(t('error'), t('reject_failed'));
             }
           }
         }
@@ -118,7 +120,7 @@ const AdminPanelScreen = () => {
 
   const handleViewDocument = (docUrl: string) => {
     if (!docUrl) {
-      Alert.alert("Not Found", "This user hasn't uploaded a document yet or the URL is invalid.");
+      Alert.alert(t('doc_not_found_title'), t('doc_not_found_msg'));
       return;
     }
     setSelectedDoc(docUrl);
@@ -131,32 +133,32 @@ const AdminPanelScreen = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert(t('logout') || 'Logout', "Are you sure you want to log out?", [
-      { text: t('cancel') || 'Cancel', style: 'cancel' },
-      { text: t('logout') || 'Logout', style: 'destructive', onPress: logout }
+    Alert.alert(t('logout'), t('logout_confirm_msg'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('logout'), style: 'destructive', onPress: logout }
     ]);
   };
 
   // --- RENDERERS ---
   const renderPendingItem = ({ item }: { item: any }) => {
     const isRestaurant = item.type === 'restaurant';
-    const roleText = isRestaurant ? (t('role_rest') || 'RESTAURANT') : (t('role_student') || 'STUDENT');
+    const roleText = isRestaurant ? t('role_rest') : t('role_student');
     const roleColor = isRestaurant ? COLORS.warning : COLORS.primary;
     
     // Fallback for new users missing joined_at
-    const joinDate = item.joined_at || "NEW"; 
+    const joinDate = item.joined_at || t('badge_new');
     
     // Clean, professional detail text
     const detailText = isRestaurant 
-      ? `🏢 ${item.detail}` 
-      : `📄 ID Document Uploaded`;
+      ? item.detail
+      : t('id_doc_uploaded');
 
     return (
       <View style={styles.pendingCard}>
         <View style={styles.pendingInfo}>
           <View style={styles.pendingHeader}>
             <Text style={[styles.userRole, { color: roleColor, backgroundColor: roleColor + '1A' }]}>
-              {roleText.toUpperCase()}
+              {toLangUpper(roleText, lang)}
             </Text>
             <Text style={styles.dateBadge}>{joinDate}</Text>
           </View>
@@ -175,24 +177,24 @@ const AdminPanelScreen = () => {
               onPress={() => handleViewDocument(item.doc)}
               activeOpacity={0.7}
             >
-              <Text style={styles.viewDocText}>🔍 View Document</Text>
+              <Ionicons name="document-text-outline" size={14} color={COLORS.textMain} />
+              <Text style={styles.viewDocText}>{t('view_document')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
         <View style={styles.actions}>
           <Button 
-            title={t('approve') || 'APPROVE'} 
+            title={t('approve')} 
             onPress={() => handleApprove(item.user_id, item.name)}
             variant="success"
             style={styles.approveBtn}
             textStyle={styles.approveBtnText}
           />
-          {/* NEW REJECT BUTTON */}
           <Button 
-            title={'REJECT'} 
+            title={t('reject')} 
             onPress={() => handleReject(item.user_id, item.name)}
-            variant="secondary"
+            variant="dangerSoft"
             style={styles.rejectBtn}
             textStyle={styles.rejectBtnText}
           />
@@ -205,8 +207,8 @@ const AdminPanelScreen = () => {
     <View style={styles.container}>
       {/* Header with Language Switcher Icon */}
       <Header 
-        title={t('nav_admin') || 'Admin Panel'} 
-        rightIcon="🌐" 
+        title={t('nav_admin')} 
+        rightIcon="globe-outline" 
         onRightPress={() => setLangModalVisible(true)} 
       />
       
@@ -216,28 +218,28 @@ const AdminPanelScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* STATS SECTION */}
-        <Text style={styles.sectionTitle}>{t('stats') || 'System Overview'}</Text>
+        <Text style={styles.sectionTitle}>{t('stats')}</Text>
         <View style={styles.grid}>
           <StatCard 
-            title={t('users') || 'TOTAL USERS'} 
+            title={toLangUpper(t('users'), lang)} 
             value={stats.total_users} 
             letterPrefix="U" 
             color={COLORS.primary} 
           />
           <StatCard 
-            title={t('active_offers') || 'ACTIVE OFFERS'} 
+            title={toLangUpper(t('active_offers'), lang)} 
             value={stats.active_offers} 
             letterPrefix="O" 
             color={COLORS.warning} 
           />
           <StatCard 
-            title={t('role_rest') || 'RESTAURANTS'} 
+            title={toLangUpper(t('role_rest'), lang)} 
             value={stats.total_restaurants} 
             letterPrefix="R" 
             color={COLORS.secondary} 
           />
           <StatCard 
-            title={t('total_claims') || 'SHARED MEALS'} 
+            title={toLangUpper(t('total_claims'), lang)} 
             value={stats.total_claims} 
             letterPrefix="M" 
             color={COLORS.success} 
@@ -250,7 +252,7 @@ const AdminPanelScreen = () => {
           <>
             {/* PENDING RESTAURANTS SECTION */}
             <View style={styles.sectionHeaderRow}>
-               <Text style={styles.sectionTitle}>Pending Restaurants</Text>
+               <Text style={styles.sectionTitle}>{t('admin_pending_rests')}</Text>
                <View style={styles.countBadge}>
                   <Text style={styles.countText}>{pendingRestaurants.length}</Text>
                </View>
@@ -268,13 +270,13 @@ const AdminPanelScreen = () => {
                 <View style={styles.emptyIconCircle}>
                    <Text style={styles.emptyIconText}>✓</Text>
                 </View>
-                <Text style={styles.emptyText}>No pending restaurants.</Text>
+                <Text style={styles.emptyText}>{t('admin_no_rests')}</Text>
               </View>
             )}
 
             {/* PENDING STUDENTS / USERS SECTION */}
             <View style={styles.sectionHeaderRow}>
-               <Text style={styles.sectionTitle}>Pending User Documents</Text>
+               <Text style={styles.sectionTitle}>{t('admin_pending_docs')}</Text>
                <View style={styles.countBadge}>
                   <Text style={styles.countText}>{pendingStudents.length}</Text>
                </View>
@@ -292,7 +294,7 @@ const AdminPanelScreen = () => {
                 <View style={styles.emptyIconCircle}>
                    <Text style={styles.emptyIconText}>✓</Text>
                 </View>
-                <Text style={styles.emptyText}>No pending user documents.</Text>
+                <Text style={styles.emptyText}>{t('admin_no_docs')}</Text>
               </View>
             )}
           </>
@@ -301,11 +303,9 @@ const AdminPanelScreen = () => {
         {/* LOGOUT BUTTON */}
         <View style={styles.footer}>
            <Button 
-             title={t('logout') || 'LOGOUT'} 
+             title={t('logout')} 
              onPress={handleLogout} 
-             variant="secondary"
-             style={styles.logoutBtn}
-             textStyle={styles.logoutText}
+             variant="dangerSoft"
            />
         </View>
         
@@ -322,7 +322,7 @@ const AdminPanelScreen = () => {
         <View style={styles.modalOverlayDark}>
           <View style={styles.docModalContent}>
             <View style={styles.docModalHeader}>
-              <Text style={styles.docModalTitle}>Document Preview</Text>
+              <Text style={styles.docModalTitle}>{t('document_preview')}</Text>
               <TouchableOpacity onPress={() => setDocModalVisible(false)} hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}>
                 <Text style={styles.closeIconText}>✕</Text>
               </TouchableOpacity>
@@ -335,11 +335,11 @@ const AdminPanelScreen = () => {
                 resizeMode="contain"
               />
             ) : (
-              <Text style={styles.emptyText}>Image could not be loaded.</Text>
+              <Text style={styles.emptyText}>{t('image_load_failed')}</Text>
             )}
             
             <Button 
-              title="CLOSE PREVIEW" 
+              title={t('close_btn')} 
               onPress={() => setDocModalVisible(false)} 
               style={styles.closeDocBtn} 
             />
@@ -356,7 +356,7 @@ const AdminPanelScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('lang_change') || 'Change Language'}</Text>
+            <Text style={styles.modalTitle}>{t('lang_change')}</Text>
             
             <TouchableOpacity style={[styles.langBtn, lang === 'en' && styles.langBtnActive]} onPress={() => switchLanguage('en')}>
                <Text style={[styles.langText, lang === 'en' && styles.langTextActive]}>🇬🇧 English</Text>
@@ -370,7 +370,7 @@ const AdminPanelScreen = () => {
                <Text style={[styles.langText, lang === 'hu' && styles.langTextActive]}>🇭🇺 Magyar</Text>
             </TouchableOpacity>
 
-            <Button title={t('close_btn') || 'Close'} onPress={() => setLangModalVisible(false)} style={{ marginTop: 20, width: '100%' }} />
+            <Button title={t('close_btn')} onPress={() => setLangModalVisible(false)} style={{ marginTop: 20, width: '100%' }} />
           </View>
         </View>
       </Modal>
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   },
   iconLetter: { fontSize: 16, fontWeight: '900' },
   statValue: { fontSize: 24, fontWeight: '900' },
-  statTitle: { fontSize: 12, color: COLORS.textSub, fontWeight: '700', textTransform: 'uppercase' },
+  statTitle: { fontSize: 12, color: COLORS.textSub, fontWeight: '700' },
 
   // Pending Cards
   pendingCard: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   pendingInfo: { flex: 1, marginBottom: 12 },
   pendingHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   userRole: { 
-    fontSize: 10, 
+    fontSize: 11, 
     fontWeight: '900', 
     paddingHorizontal: 8, 
     paddingVertical: 3, 
@@ -458,12 +458,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginRight: 10
   },
-  dateBadge: { fontSize: 10, color: COLORS.textSub, fontWeight: '600' },
+  dateBadge: { fontSize: 11, color: COLORS.textSub, fontWeight: '600' },
   userName: { fontSize: 15, fontWeight: 'bold', color: COLORS.textMain, marginBottom: 2 },
   userEmail: { fontSize: 13, color: COLORS.textSub, marginBottom: 6 },
-  userDetail: { fontSize: 11, color: COLORS.secondary, fontStyle: 'italic', fontWeight: '500' },
+  userDetail: { fontSize: 12, color: COLORS.secondary, fontStyle: 'italic', fontWeight: '500' },
   
   viewDocBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginTop: 8,
     backgroundColor: '#F3F4F6',
     paddingVertical: 6,
@@ -477,8 +480,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 10 },
   approveBtn: { flex: 1, height: 40, borderRadius: 10 },
   approveBtnText: { fontSize: 12, fontWeight: 'bold' },
-  rejectBtn: { flex: 1, height: 40, borderRadius: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  rejectBtnText: { fontSize: 12, fontWeight: 'bold', color: '#DC2626' },
+  rejectBtn: { flex: 1, height: 40, borderRadius: 10 },
+  rejectBtnText: { fontSize: 12, fontWeight: 'bold' },
 
   // Empty State
   emptyState: { 
@@ -503,8 +506,6 @@ const styles = StyleSheet.create({
 
   // Footer (Logout)
   footer: { marginTop: 40 },
-  logoutBtn: { backgroundColor: '#FFEBEE', borderWidth: 0, borderRadius: 12 },
-  logoutText: { color: '#D32F2F', fontWeight: 'bold' },
 
   // Modals Styles
   modalOverlay: { 

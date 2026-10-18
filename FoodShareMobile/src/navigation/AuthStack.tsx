@@ -5,6 +5,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 // 🚀 NEW: Imported the Forgot Password Screen
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -15,6 +16,7 @@ export const AuthStack = () => {
       <Stack.Screen name="Register" component={RegisterScreen} />
       {/* 🚀 NEW: Registered the Forgot Password route */}
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </Stack.Navigator>
   );
 };

@@ -74,6 +74,33 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Google Maps API key: read from the git-ignored FoodShareMobile/.env (MAPS_API_KEY=...) or the
+ * MAPS_API_KEY environment variable, and injected into AndroidManifest.xml via a manifest placeholder,
+ * so the key is never committed. Without it the build still works, but the map shows no tiles.
+ */
+def readMapsApiKey() {
+    def fromEnv = System.getenv('MAPS_API_KEY')
+    if (fromEnv) {
+        return fromEnv.trim()
+    }
+    def envFile = rootProject.file('../.env')
+    if (envFile.exists()) {
+        def line = envFile.readLines().find { it.trim().startsWith('MAPS_API_KEY=') }
+        if (line) {
+            return line.trim().substring('MAPS_API_KEY='.length()).trim().replaceAll(/^["']|["']$/, '')
+        }
+    }
+    return ''
+}
+def mapsApiKey = readMapsApiKey()
+if (!mapsApiKey) {
+    logger.warn('WARNING: MAPS_API_KEY is not set (FoodShareMobile/.env); Google Maps will not load map tiles.')
+    // An empty meta-data value makes the Maps SDK throw "API key not found" when the map mounts;
+    // a non-secret marker keeps the old behaviour instead (map without tiles, "Authorization failure" in logcat).
+    mapsApiKey = 'MAPS_API_KEY_NOT_SET'
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -86,6 +113,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        manifestPlaceholders = [MAPS_API_KEY: mapsApiKey]
     }
     signingConfigs {
         debug {

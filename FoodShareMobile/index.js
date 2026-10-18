@@ -10,8 +10,7 @@ import messaging from '@react-native-firebase/messaging';
 
 // Register background handler
 // This listener processes notifications when the app is in the background or completely closed (quit state)
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  console.log('Message handled in the background!', remoteMessage);
-});
+// The handler must exist for background delivery; the message is not logged (it can contain user data).
+messaging().setBackgroundMessageHandler(async () => {});
 
 AppRegistry.registerComponent(appName, () => App);

@@ -1,147 +1,238 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  StyleSheet, 
-  TextInputProps, 
-  TouchableOpacity 
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TextInputProps,
+  TouchableOpacity,
 } from 'react-native';
-import { COLORS, SIZES } from '../constants/theme';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {
+  COLORS,
+  SIZES,
+  SPACING,
+  SHADOWS,
+} from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
-// --- INTERFACES ---
 interface InputProps extends TextInputProps {
   label?: string;
-  icon?: string | React.ReactNode; 
+  icon?: string | React.ReactNode;
   error?: string;
   isPassword?: boolean;
 }
 
-export const Input = ({ label, icon, error, isPassword, style, ...props }: InputProps) => {
-  // --- STATE ---
+export const Input = ({
+  label,
+  icon,
+  error,
+  isPassword = false,
+  style,
+  onFocus,
+  onBlur,
+  ...props
+}: InputProps) => {
+  const { t } = useAuth();
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const handleFocus = (event: any) => {
+    setIsFocused(true);
+    onFocus?.(event);
+  };
+
+  const handleBlur = (event: any) => {
+    setIsFocused(false);
+    onBlur?.(event);
+  };
+
   return (
     <View style={[styles.container, style]}>
-      
-      {/* --- LABEL --- */}
-      {label && <Text style={styles.label}>{label}</Text>}
-      
-      {/* --- INPUT WRAPPER --- */}
-      <View style={[
-        styles.inputWrapper,
-        isFocused && styles.focused,
-        error ? styles.errorBorder : null
-      ]}>
-        
-        {/* --- OPTIONAL ICON --- */}
+
+      {/* Label */}
+      {label && (
+        <Text style={styles.label}>
+          {label}
+        </Text>
+      )}
+
+      {/* Input */}
+      <View
+        style={[
+          styles.inputWrapper,
+          isFocused && styles.focused,
+          error && styles.errorBorder,
+        ]}
+      >
+
+        {/* Left icon */}
         {icon && (
           <View style={styles.iconBox}>
             {typeof icon === 'string' ? (
-              <Text style={styles.iconText}>{icon}</Text>
+              <Ionicons
+                name={icon as any}
+                size={20}
+                color={
+                  isFocused
+                    ? COLORS.primary
+                    : COLORS.textMuted
+                }
+              />
             ) : (
               icon
             )}
           </View>
         )}
-        
-        {/* --- TEXT FIELD --- */}
+
+        {/* Text field */}
         <TextInput
+          {...props}
           style={styles.input}
           placeholderTextColor={COLORS.placeholder}
-          secureTextEntry={isPassword && !showPassword}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          {...props}
+          secureTextEntry={
+            isPassword && !showPassword
+          }
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
 
-        {/* --- PASSWORD TOGGLE (Clean Typography) --- */}
+        {/* Password toggle */}
         {isPassword && (
-          <TouchableOpacity 
-            onPress={() => setShowPassword(!showPassword)}
+          <TouchableOpacity
+            onPress={() =>
+              setShowPassword((previous) => !previous)
+            }
             activeOpacity={0.7}
             style={styles.toggleBtn}
+            hitSlop={{
+              top: 8,
+              bottom: 8,
+              left: 8,
+              right: 8,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              showPassword
+                ? t('a11y_hide_password')
+                : t('a11y_show_password')
+            }
           >
-            <Text style={styles.toggleText}>
-              {showPassword ? 'Hide' : 'Show'}
-            </Text>
+            <Ionicons
+              name={
+                showPassword
+                  ? 'eye-off-outline'
+                  : 'eye-outline'
+              }
+              size={20}
+              color={COLORS.textMuted}
+            />
           </TouchableOpacity>
         )}
       </View>
-      
-      {/* --- ERROR MESSAGE --- */}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {/* Error */}
+      {error && (
+        <View style={styles.errorRow}>
+          <Ionicons
+            name="alert-circle-outline"
+            size={14}
+            color={COLORS.danger}
+          />
+
+          <Text style={styles.errorText}>
+            {error}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
 
-// --- STYLES ---
 const styles = StyleSheet.create({
-  container: { 
-    marginBottom: 20 
+  container: {
+    width: '100%',
+    marginBottom: SPACING.lg,
   },
+
   label: {
-    fontSize: 13, // Slightly larger for sentence case
+    fontSize: 12,
     fontWeight: '700',
-    color: COLORS.textSub,
-    marginBottom: 8,
-    marginLeft: 4,
-    // Removed uppercase transformation based on UX feedback
+    color: COLORS.textMain,
+    marginBottom: SPACING.sm,
+    marginLeft: SPACING.xs,
+    letterSpacing: 0.15,
   },
+
   inputWrapper: {
+    minHeight: 54,
+
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputFill, 
-    borderRadius: SIZES.radius, // 10px for slightly sharper, structured look
-    height: 56,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: COLORS.border, // Visible border added
+
+    backgroundColor: COLORS.inputFill,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.radiusMd,
+
+    paddingHorizontal: SPACING.md,
+
+    ...SHADOWS.light,
   },
+
   focused: {
-    borderColor: COLORS.primary, // Highlights with Terra Cotta on focus
-    backgroundColor: '#FFFFFF',
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+    backgroundColor: COLORS.surface,
   },
+
   errorBorder: {
-    borderColor: COLORS.danger
+    borderColor: COLORS.danger,
   },
-  iconBox: { 
-    marginRight: 12, 
+
+  iconBox: {
+    width: 28,
+    marginRight: SPACING.sm,
+
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center'
   },
-  iconText: {
-    fontSize: 16,
-    color: COLORS.textSub,
-    fontWeight: 'bold'
-  },
-  input: { 
-    flex: 1, 
-    color: COLORS.textMain, 
+
+  input: {
+    flex: 1,
+    minHeight: 52,
+
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+
+    color: COLORS.textMain,
     fontSize: 15,
     fontWeight: '500',
-    height: '100%', 
   },
+
   toggleBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+
+    marginLeft: SPACING.sm,
+
     alignItems: 'center',
-    backgroundColor: '#F0F0F0', 
-    borderRadius: SIZES.radiusSm,
-    marginLeft: 10
+    justifyContent: 'center',
   },
-  toggleText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.textSub,
+
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    marginTop: SPACING.xs,
+    marginLeft: SPACING.xs,
   },
-  errorText: { 
-    color: COLORS.danger, 
-    fontSize: 12, 
-    marginTop: 6, 
-    marginLeft: 4,
-    fontWeight: '600' 
-  }
+
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: SPACING.xs,
+  },
 });

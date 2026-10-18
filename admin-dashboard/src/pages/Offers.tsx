@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users as UsersIcon, Store, UtensilsCrossed, 
   LogOut, FileText, Search, Ban, ChevronUp, ChevronDown, ChevronsUpDown 
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 
 // Interface for offer data from the backend
 interface SystemOffer {
@@ -49,7 +49,10 @@ export default function Offers() {
     fetchOffers();
   }, []);
 
-  const handleLogout = () => navigate('/');
+  const handleLogout = () => {
+    clearAdminSession();
+    navigate('/', { replace: true });
+  };
 
   // Cancel an offer action
   const handleCancelOffer = async (offerId: number, offerTitle: string, restaurantName: string) => {

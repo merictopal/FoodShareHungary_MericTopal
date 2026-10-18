@@ -1,11 +1,19 @@
 // --- HISTORY CARD COMPONENT ---
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { styles } from '../styles';
+import { COLORS } from '../../../../constants/theme';
+import { useAuth } from '../../../../context/AuthContext';
+import { toLangUpper } from '../../../../utils/text';
 
 export interface HistoryItem {
   id: number;
   restaurant_name: string;
+  // Pickup location (GET /api/student/history); any of these may be null
+  restaurant_address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   offer_title: string;
   type: 'free' | 'discount';
   date: string;
@@ -20,18 +28,19 @@ interface HistoryCardProps {
 }
 
 export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onPress, t }) => {
+  const { lang } = useAuth();
   const isFree = item.type === 'free';
   const isPending = item.status === 'pending';
   const isValidated = item.status === 'validated';
 
   // Dynamic colors and text based on type
-  const typeColor = isFree ? '#2ECC71' : '#F39C12'; 
-  const typeLabel = isFree ? t('free').toUpperCase() : t('discount').toUpperCase();
+  const typeColor = isFree ? COLORS.success : COLORS.warningText;
+  const typeLabel = toLangUpper(isFree ? t('free') : t('discount'), lang);
 
   // Dynamic colors and text based on status
-  const cardBg = isPending ? '#FFF8E1' : (isValidated ? '#E8F5E9' : '#F5F5F5');
-  const statusColor = isPending ? '#F5B041' : (isValidated ? '#2ECC71' : '#95A5A6');
-  const badgeIcon = isPending ? '🕒' : (isValidated ? '✓' : '✖');
+  const cardBg = isPending ? COLORS.warningLight : (isValidated ? COLORS.successLight : COLORS.surfaceMuted);
+  const statusColor = isPending ? COLORS.warningText : (isValidated ? COLORS.success : COLORS.textMuted);
+  const badgeIcon = isPending ? 'time-outline' : (isValidated ? 'checkmark' : 'close');
   
   // Use translations for status badges
   let badgeText = t('status_cancelled');
@@ -50,7 +59,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onPress, t }) =>
     >
       <View style={[styles.cardStrip, { backgroundColor: typeColor }]} />
       
-      <View style={[styles.cardIconBox, { backgroundColor: '#FFFFFF' }]}>
+      <View style={[styles.cardIconBox, { backgroundColor: COLORS.surface }]}>
          <Text style={[styles.cardIconLetter, { color: typeColor }]}>
            {isFree ? 'F' : 'D'}
          </Text>
@@ -77,9 +86,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({ item, onPress, t }) =>
 
       <View style={styles.cardAction}>
          <View style={[styles.statusCircle, { backgroundColor: statusColor }]}>
-           <Text style={styles.statusCircleIcon}>
-             {badgeIcon}
-           </Text>
+           <Ionicons name={badgeIcon} size={20} color={COLORS.white} />
          </View>
          <Text style={[styles.statusLabelText, { color: statusColor }]}>
            {badgeText}

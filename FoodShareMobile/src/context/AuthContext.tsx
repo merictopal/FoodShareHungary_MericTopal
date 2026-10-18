@@ -1,10 +1,11 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { Alert } from 'react-native';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/auth';
 import { TRANSLATIONS } from '../constants/translations';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { client } from '../api/client';
+import { client, setSessionExpiredHandler } from '../api/client';
+import { apiErrorKey } from '../utils/apiErrors';
 import messaging from '@react-native-firebase/messaging';
 // 🚀 NEW: Import the Google Client ID securely from your .env file
 import { GOOGLE_WEB_CLIENT_ID } from '@env'; 
@@ -30,6 +31,8 @@ type AuthContextType = {
   changeLanguage: (newLang: string) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
   updateUser: (u: User) => void;
+  // Re-reads the logged-in user from the backend; resolves to the fresh user (or null if it couldn't)
+  refreshUser: () => Promise<User>;
   // 🚀 NEW: Added Google Login function type
   loginWithGoogle: (idToken: string) => Promise<void>; 
 };
@@ -41,6 +44,9 @@ const STORAGE_KEYS = {
   REFRESH_TOKEN: '@FoodShare_RefreshToken', 
   LANG: '@FoodShare_Lang',
 };
+
+// Upper bound for the logout FCM unlink (getToken + request) so logout never hangs on the network
+const FCM_UNLINK_TIMEOUT_MS = 3000;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -86,8 +92,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadAppData();
   }, []);
 
+  // --- 1b. SESSION EXPIRY ---
+  // The API client calls this when the refresh token is rejected; it has already removed the
+  // stored tokens. Clearing the user switches AppNavigator to the login stack, which unmounts
+  // all authenticated screens so no further authenticated requests are made.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      GoogleSignin.signOut().catch(() => {});
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
+
   // --- 2. ADVANCED TRANSLATION FUNCTION ---
-  const t = (key: string, params?: Record<string, string | number>) => {
+  // Stable per language so memoized consumers aren't invalidated by unrelated provider renders
+  const t = useCallback((key: string, params?: Record<string, string | number>) => {
     let translation = '';
     if (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) {
       translation = TRANSLATIONS[lang][key];
@@ -104,91 +123,119 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
     return translation;
-  };
+  }, [lang]);
 
   // --- 3. LANGUAGE CHANGE ---
-  const changeLanguage = async (newLang: string) => {
+  const changeLanguage = useCallback(async (newLang: string) => {
     try {
       setLang(newLang);
       await AsyncStorage.setItem(STORAGE_KEYS.LANG, newLang);
     } catch (error) {
       console.error('Failed to save language preference:', error);
     }
-  };
+  }, []);
 
   // --- 4. STANDARD LOGIN ---
-  const login = async (email: string, pass: string) => {
+  const login = useCallback(async (email: string, pass: string) => {
     setIsLoading(true);
     try {
       const res = await authApi.login(email, pass);
       if (res.success) {
-        setUser(res.user);
-        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
-        
+        // Persist tokens before setUser: setting the user triggers authenticated requests (FCM sync).
         if (res.token) await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
         if (res.refresh_token) await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.refresh_token);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.user));
+        setUser(res.user);
       } else {
         throw new Error(res.message);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || t('error');
-      Alert.alert(t('error'), errorMsg);
+      // Translated by the backend's error title, never its English message
+      const key = apiErrorKey(error, 'generic_error');
+      if (key === 'err_application_rejected') {
+        // Rejected restaurant: offer a new application (back to pending) with the credentials just entered
+        Alert.alert(t('error'), t(key), [
+          { text: t('cancel'), style: 'cancel' },
+          {
+            text: t('reapply_btn'),
+            onPress: () => {
+              authApi.reapplyRestaurant(email, pass)
+                .then(() => Alert.alert(t('success'), t('msg_reg_success_rest')))
+                .catch(err => Alert.alert(t('error'), t(apiErrorKey(err, 'generic_error'))));
+            },
+          },
+        ]);
+      } else {
+        Alert.alert(t('error'), t(key));
+      }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   // --- 5. GOOGLE LOGIN (NEW) ---
-  const loginWithGoogle = async (idToken: string) => {
+  const loginWithGoogle = useCallback(async (idToken: string) => {
     setIsLoading(true);
     try {
       // Send the Google ID Token to our Python backend for verification
       const res = await client.post('/auth/google', { token: idToken });
       
       if (res.data.success) {
-        // Save the session exactly like a standard login
-        setUser(res.data.user);
-        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.data.user));
-        
+        // Save the session exactly like a standard login (tokens first, then user state)
         if (res.data.token) await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.data.token);
         if (res.data.refresh_token) await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, res.data.refresh_token);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(res.data.user));
+        setUser(res.data.user);
       } else {
         throw new Error(res.data.message);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || "Google Login Verification Failed";
-      Alert.alert(t('error'), errorMsg);
-      console.error("Google Backend Auth Error:", error);
+      Alert.alert(t('error'), t(apiErrorKey(error, 'google_login_failed')));
+      // Status/message only: the error object carries the request body (the Google ID token)
+      console.warn('Google backend auth failed:', error?.response?.status ?? error?.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   // --- 6. REGISTER OPERATION ---
-  const register = async (data: any) => {
+  const register = useCallback(async (data: any) => {
     setIsLoading(true);
     try {
       const res = await authApi.register(data);
       if (res.success) {
-        Alert.alert(t('success'), res.message);
+        Alert.alert(t('success'), t('msg_reg_success_student'));
       } else {
         throw new Error(res.message);
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || t('error');
-      Alert.alert(t('error'), errorMsg);
+      Alert.alert(t('error'), t(apiErrorKey(error, 'generic_error')));
       throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   // --- 7. LOGOUT OPERATION ---
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setIsLoading(true);
     try {
       setUser(null);
+
+      // Best-effort: unlink this device's push token from the account so its notifications don't reach the
+      // next user of the device. Must run while the access token is still stored (the client reads it from
+      // storage). Bounded and failure-tolerant: local logout always completes. If it fails, the backend
+      // unlinks the token anyway when another account links it on this device.
+      try {
+        await Promise.race([
+          messaging().getToken().then(token => authApi.clearFcmToken(token)),
+          new Promise<void>(resolve => setTimeout(() => resolve(), FCM_UNLINK_TIMEOUT_MS)),
+        ]);
+      } catch {
+        // Ignored: offline, expired session or Firebase unavailable
+      }
+
       await AsyncStorage.removeItem(STORAGE_KEYS.USER);
       await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
       await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -204,38 +251,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // --- 7b. USER STATE PERSISTENCE + SERVER REFRESH ---
+  // Local changes (avatar, document upload) are written to storage too, so they survive a restart.
+  const updateUser = useCallback((u: User) => {
+    setUser(u);
+    if (u) {
+      AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(u)).catch(() => {});
+    }
+  }, []);
+
+  // The stored user is a login-time snapshot; server-side changes (e.g. an admin approving the
+  // student's document) only reach the app through this re-read of the caller's own record.
+  const userRef = useRef<User>(null);
+  userRef.current = user;
+
+  const refreshUser = useCallback(async (): Promise<User> => {
+    const userId = userRef.current?.id;
+    if (!userId) return null;
+    try {
+      const res = await client.get(`/auth/me/${userId}`);
+      const fresh = res.data?.user;
+      // Ignore the answer if the session ended or changed while the request was running
+      if (!res.data?.success || !fresh || userRef.current?.id !== userId) return null;
+      const merged: User = { ...userRef.current, ...fresh };
+      userRef.current = merged;
+      setUser(merged);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(merged));
+      return merged;
+    } catch {
+      // Offline/5xx: keep the current state. An expired session is handled by the API client.
+      return null;
+    }
+  }, []);
+
+  // Refresh once per session start (login or restored session) and whenever the app returns to the foreground
+  useEffect(() => {
+    if (!user?.id) return;
+    refreshUser();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshUser();
+    });
+    return () => subscription.remove();
+  }, [user?.id, refreshUser]);
 
   // --- 8. SYNC FCM TOKEN ---
   useEffect(() => {
+    // Keyed on the id only: profile updates (avatar, document) replace the user object but need no token re-sync
+    const userId = user?.id;
     const syncToken = async () => {
-      if (!user || !user.id) return;
+      if (!userId) return;
       try {
         const token = await messaging().getToken();
-        await authApi.updateFcmToken(token, user.id);
+        await authApi.updateFcmToken(token, userId);
       } catch (error: any) {
         console.log('⚠️ [MVP] Ignored FCM Token Sync Error:', error?.message);
       }
     };
     syncToken();
-  }, [user]);
+  }, [user?.id]);
 
-  if (!isInitialized) return null; 
+  // Same value shape as before; only re-created when one of its parts actually changes
+  const contextValue = useMemo(() => ({
+    user,
+    isLoading,
+    isInitialized,
+    lang,
+    login,
+    register,
+    logout,
+    changeLanguage,
+    t,
+    updateUser,
+    refreshUser,
+    loginWithGoogle // 🚀 NEW: Exported Google Login function
+  }), [user, isLoading, isInitialized, lang, login, register, logout, changeLanguage, t, updateUser, refreshUser, loginWithGoogle]);
+
+  if (!isInitialized) return null;
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      isInitialized,
-      lang, 
-      login, 
-      register, 
-      logout, 
-      changeLanguage, 
-      t, 
-      updateUser: setUser,
-      loginWithGoogle // 🚀 NEW: Exported Google Login function
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

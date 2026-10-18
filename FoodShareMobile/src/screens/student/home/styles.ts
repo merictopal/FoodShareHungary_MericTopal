@@ -1,123 +1,763 @@
-import { StyleSheet, Dimensions, Platform } from 'react-native';
-import { COLORS, SHADOWS } from '../../../constants/theme';
+import { StyleSheet, Dimensions } from 'react-native';
+
+import {
+  COLORS,
+  SHADOWS,
+  SIZES,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
-const MAP_HEIGHT_RATIO = 0.38; 
+
+const MAP_HEIGHT_RATIO = 0.34;
+
+// How far the offer list sheet slides up over the bottom of the map
+export const SHEET_OVERLAP = 24;
 
 export const mapStyle = [
-  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
-  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
-  { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
-  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
-  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
-  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
-  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
-  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#F2F4F3' }],
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#68736F' }],
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#F2F4F3' }],
+  },
+  {
+    featureType: 'administrative.land_parcel',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#B5BCB8' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#E9EEEB' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#7A8580' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#DDE8E0' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#819187' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#FFFFFF' }],
+  },
+  {
+    featureType: 'road.arterial',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#727C78' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#D8DDD9' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#626D68' }],
+  },
+  {
+    featureType: 'road.local',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#8D9692' }],
+  },
+  {
+    featureType: 'transit.line',
+    elementType: 'geometry',
+    stylers: [{ color: '#E0E5E2' }],
+  },
+  {
+    featureType: 'transit.station',
+    elementType: 'geometry',
+    stylers: [{ color: '#E7ECE9' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#C9D9D8' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#7B8C8A' }],
+  },
 ];
 
 export const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  
-  // Map Elements
-  mapSection: { height: height * MAP_HEIGHT_RATIO, width: width, backgroundColor: '#EAECEF' },
-  map: { ...StyleSheet.absoluteFillObject },
-  headerOverlay: { position: 'absolute', top: Platform.OS === 'ios' ? 40 : 30, left: 0, right: 0, zIndex: 10 },
-  myLocationBtn: { position: 'absolute', bottom: 30, right: 20, backgroundColor: '#FFFFFF', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
-  locationIcon: { fontSize: 26, color: COLORS.textMain, fontWeight: '400', marginBottom: 2 },
 
-  // Bottom Sheet List
-  listContainer: { flex: 1, backgroundColor: COLORS.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, marginTop: -24, paddingTop: 12, overflow: 'hidden', ...SHADOWS.heavy },
-  handleBar: { width: 48, height: 5, backgroundColor: '#D1D5DB', borderRadius: 4, alignSelf: 'center', marginBottom: 16 },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, color: COLORS.textSub, fontSize: 14, fontWeight: '600' },
+  // =========================================================
+  // MAIN
+  // =========================================================
 
-  // Sections
-  sectionContainer: { marginBottom: 24, marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: COLORS.textMain, marginLeft: 24, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
 
-  // Leaderboard
-  lbCard: { backgroundColor: '#FFFFFF', paddingVertical: 16, paddingHorizontal: 12, borderRadius: 16, marginRight: 16, width: 130, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6', ...SHADOWS.light },
-  lbCardHighlight: { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' },
-  lbRank: { fontSize: 24, fontWeight: '900', marginBottom: 6 },
-  lbName: { fontSize: 14, fontWeight: '800', color: COLORS.textMain, textAlign: 'center', marginBottom: 6, letterSpacing: -0.3 },
-  lbStats: { alignItems: 'center' },
-  lbPoints: { fontSize: 11, color: COLORS.primary, fontWeight: '900', letterSpacing: 0.5 },
-  lbMeals: { fontSize: 10, color: COLORS.textSub, marginTop: 2, fontWeight: '600' },
+  // =========================================================
+  // MAP
+  // =========================================================
 
-  // AI Cards
-  aiCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginRight: 16, width: width * 0.65, borderWidth: 1, borderColor: '#E5E7EB', ...SHADOWS.light },
-  aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  aiImage: { width: 44, height: 44, borderRadius: 12, marginRight: 12, backgroundColor: '#EAECEF' },
-  aiIconBox: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  aiIconLetter: { fontSize: 20, fontWeight: '900' },
-  aiInfo: { flex: 1 },
-  aiTitle: { fontSize: 14, fontWeight: '900', color: COLORS.textMain, letterSpacing: -0.3 },
-  aiDesc: { fontSize: 11, color: '#6B7280', marginTop: 2, fontWeight: '500' },
-  aiFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  aiClaimBtn: { height: 32, paddingHorizontal: 12, borderRadius: 10 },
+  mapSection: {
+    height: height * MAP_HEIGHT_RATIO,
+    width,
+    backgroundColor: COLORS.surfaceMuted,
+  },
 
-  // Filters
-  filterContainer: { flexDirection: 'row', paddingHorizontal: 24, paddingBottom: 16, backgroundColor: COLORS.background, gap: 12, paddingTop: 8 },
-  filterBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', ...SHADOWS.light },
-  filterBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  filterText: { fontSize: 12, color: COLORS.textSub, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  filterTextActive: { color: '#FFFFFF' },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
 
-  // Offers List
-  offersSection: { paddingBottom: 24 },
-  offerCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginHorizontal: 24, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6', ...SHADOWS.light },
-  cardIconImage: { width: 52, height: 52, borderRadius: 16, marginRight: 16, backgroundColor: '#EAECEF' },
-  cardIconBox: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  cardIconLetter: { fontSize: 24, fontWeight: '900' },
-  cardInfo: { flex: 1 },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '900', color: COLORS.textMain, letterSpacing: -0.3 },
-  distText: { fontSize: 11, color: COLORS.textSub, fontWeight: '700' },
-  cardDesc: { fontSize: 13, color: '#6B7280', marginTop: 4, marginBottom: 10, fontWeight: '500' },
-  tagsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tagBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  tagText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  stockText: { fontSize: 11, color: '#9CA3AF', fontWeight: '700' },
-  cardAction: { marginLeft: 12 },
-  miniBtn: { width: 72, height: 40, borderRadius: 12 },
+  // =========================================================
+  // HOME HEADER
+  // =========================================================
 
-  // Empty State
-  emptyContainer: { alignItems: 'center', marginTop: 40, paddingHorizontal: 40 },
-  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  emptyIconText: { fontSize: 28, fontWeight: '900', color: '#D1D5DB' },
-  emptyTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textSub, textAlign: 'center' },
+  homeHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
 
-  // Custom Map Markers & Callout
-  customMarker: { backgroundColor: '#FFFFFF', padding: 6, borderRadius: 20, borderWidth: 3, ...SHADOWS.medium, width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  markerText: { fontSize: 14, fontWeight: '900' },
-  borderSuccess: { borderColor: COLORS.success },
-  borderWarning: { borderColor: COLORS.warning },
-  calloutBubble: { backgroundColor: '#FFFFFF', padding: 12, borderRadius: 16, width: 160, alignItems: 'center', ...SHADOWS.medium },
-  calloutTitle: { fontWeight: '900', fontSize: 13, marginBottom: 4, color: COLORS.textMain },
-  calloutDesc: { fontSize: 11, color: COLORS.textSub, marginBottom: 10, fontWeight: '500' },
-  calloutBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  calloutBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+    flexDirection: 'row',
+    alignItems: 'center',
 
-  // Color Helpers
-  bgSuccess: { backgroundColor: COLORS.success },
-  bgWarning: { backgroundColor: COLORS.warning },
-  textSuccess: { color: COLORS.success },
-  textWarning: { color: COLORS.warning },
+    paddingHorizontal: SPACING.xxl,
+    paddingBottom: SPACING.md,
 
-  // Modal Specific Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32, alignItems: 'center', ...SHADOWS.heavy },
-  modalTitleSuccess: { fontSize: 20, fontWeight: '900', color: COLORS.primary, marginBottom: 16 },
-  modalInfoText: { fontSize: 14, color: COLORS.textSub, textAlign: 'center', marginBottom: 24, fontWeight: '500' },
-  qrCodeWrapper: { padding: 20, backgroundColor: '#F8F9FA', borderRadius: 20, marginBottom: 24 }
+    backgroundColor: 'rgba(248,245,240,0.96)',
+
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(31,41,51,0.08)',
+
+    zIndex: 20,
+  },
+
+  // In-flow (not absolute) so it gives the header its height now that the
+  // duplicate profile shortcut is gone; minHeight keeps the previous bar height.
+  greetingContainer: {
+    flex: 1,
+    minHeight: 46,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  greetingText: {
+    color: COLORS.textMain,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+
+  greetingSubtext: {
+    display: 'none',
+  },
+
+  // Kept for compatibility
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+
+  // =========================================================
+  // LOCATION BUTTON
+  // =========================================================
+
+  myLocationBtn: {
+    position: 'absolute',
+
+    bottom: 28,
+    right: 20,
+
+    width: 48,
+    height: 48,
+
+    borderRadius: SIZES.radiusFull,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.85)',
+
+    ...SHADOWS.medium,
+  },
+
+  locationIcon: {
+    fontSize: 25,
+    color: COLORS.secondary,
+    fontWeight: '400',
+    marginBottom: 1,
+  },
+
+  // =========================================================
+  // BOTTOM SHEET
+  // =========================================================
+
+  listContainer: {
+    flex: 1,
+
+    backgroundColor: COLORS.background,
+
+    borderTopLeftRadius: SIZES.radiusXl,
+    borderTopRightRadius: SIZES.radiusXl,
+
+    marginTop: -SHEET_OVERLAP,
+
+    paddingTop: SPACING.md,
+
+    overflow: 'hidden',
+
+    ...SHADOWS.heavy,
+  },
+
+  handleBar: {
+    width: 42,
+    height: 4,
+
+    backgroundColor: COLORS.borderStrong,
+
+    borderRadius: SIZES.radiusFull,
+
+    alignSelf: 'center',
+
+    marginBottom: SPACING.lg,
+  },
+
+  centerContent: {
+    flex: 1,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    paddingHorizontal: SPACING.xxl,
+  },
+
+  loadingText: {
+    marginTop: SPACING.md,
+    color: COLORS.textSub,
+    ...TYPOGRAPHY.bodyMedium,
+  },
+
+  // =========================================================
+  // SECTIONS
+  // =========================================================
+
+  sectionContainer: {
+    marginBottom: SPACING.xxl,
+    marginTop: SPACING.xs,
+  },
+
+  sectionTitle: {
+    marginLeft: SPACING.xxl,
+    marginBottom: SPACING.md,
+
+    color: COLORS.textMain,
+
+    ...TYPOGRAPHY.heading,
+  },
+
+  // =========================================================
+  // LEADERBOARD
+  // =========================================================
+
+  lbCard: {
+    width: 138,
+    minHeight: 142,
+
+    marginRight: SPACING.md,
+
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+
+    borderRadius: SIZES.radiusMd,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  lbCardHighlight: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: '#E8C5BE',
+  },
+
+  lbRank: {
+    fontSize: 23,
+    fontWeight: '800',
+
+    color: COLORS.primary,
+
+    marginBottom: SPACING.xs,
+  },
+
+  lbName: {
+    color: COLORS.textMain,
+
+    textAlign: 'center',
+
+    marginBottom: SPACING.sm,
+
+    ...TYPOGRAPHY.bodyBold,
+  },
+
+  lbStats: {
+    alignItems: 'center',
+  },
+
+  lbPoints: {
+    color: COLORS.primary,
+
+    ...TYPOGRAPHY.caption,
+
+    fontWeight: '700',
+  },
+
+  lbMeals: {
+    color: COLORS.textMuted,
+
+    marginTop: 2,
+
+    ...TYPOGRAPHY.caption,
+  },
+
+  // =========================================================
+  // RECOMMENDED / AI CARDS
+  // =========================================================
+
+  aiCard: {
+    width: width * 0.68,
+
+    marginRight: SPACING.md,
+
+    padding: SPACING.lg,
+
+    borderRadius: SIZES.radiusMd,
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  aiCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    marginBottom: SPACING.md,
+  },
+
+  aiImage: {
+    width: 46,
+    height: 46,
+
+    borderRadius: SIZES.radius,
+
+    marginRight: SPACING.md,
+
+    backgroundColor: COLORS.surfaceMuted,
+  },
+
+  aiIconBox: {
+    width: 46,
+    height: 46,
+
+    borderRadius: SIZES.radius,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: SPACING.md,
+  },
+
+  aiIconLetter: {
+    fontSize: 19,
+    fontWeight: '800',
+  },
+
+  aiInfo: {
+    flex: 1,
+  },
+
+  aiTitle: {
+    color: COLORS.textMain,
+    ...TYPOGRAPHY.bodyBold,
+  },
+
+  aiDesc: {
+    color: COLORS.textMuted,
+
+    marginTop: 3,
+
+    ...TYPOGRAPHY.caption,
+  },
+
+  aiFooter: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  aiClaimBtn: {
+    height: 36,
+
+    paddingHorizontal: SPACING.md,
+
+    borderRadius: SIZES.radiusSm,
+  },
+
+  // =========================================================
+  // FILTERS
+  // =========================================================
+
+  filterContainer: {
+    flexDirection: 'row',
+
+    paddingHorizontal: SPACING.xxl,
+
+    paddingTop: SPACING.xs,
+    paddingBottom: SPACING.lg,
+
+    backgroundColor: COLORS.background,
+
+    gap: SPACING.sm,
+  },
+
+  filterBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.lg,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  filterBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+
+  filterText: {
+    color: COLORS.textSub,
+    ...TYPOGRAPHY.label,
+  },
+
+  filterTextActive: {
+    color: COLORS.white,
+  },
+
+  // =========================================================
+  // ACTIVE OFFERS
+  // =========================================================
+
+  offersSection: {
+    paddingBottom: SPACING.xxl,
+  },
+
+  offersLoading: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xxxl,
+  },
+
+  offersErrorNotice: {
+    marginHorizontal: SPACING.xxl,
+    marginBottom: SPACING.md,
+    color: COLORS.textSub,
+    textAlign: 'center',
+    ...TYPOGRAPHY.bodyMedium,
+  },
+
+  offerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    marginHorizontal: SPACING.xxl,
+    marginBottom: SPACING.md,
+
+    padding: SPACING.lg,
+
+    borderRadius: SIZES.radiusMd,
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  cardIconImage: {
+    width: 54,
+    height: 54,
+
+    borderRadius: SIZES.radius,
+
+    marginRight: SPACING.md,
+
+    backgroundColor: COLORS.surfaceMuted,
+  },
+
+  cardIconBox: {
+    width: 54,
+    height: 54,
+
+    borderRadius: SIZES.radius,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: SPACING.md,
+  },
+
+  cardIconLetter: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+
+  cardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  cardHeaderRow: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  cardTitle: {
+    flex: 1,
+
+    color: COLORS.textMain,
+
+    marginRight: SPACING.sm,
+
+    ...TYPOGRAPHY.bodyBold,
+  },
+
+  distText: {
+    color: COLORS.textMuted,
+
+    ...TYPOGRAPHY.caption,
+  },
+
+  cardDesc: {
+    color: COLORS.textMuted,
+
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
+
+    ...TYPOGRAPHY.caption,
+  },
+
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+
+    alignItems: 'center',
+
+    columnGap: SPACING.md,
+    rowGap: SPACING.xs,
+  },
+
+  stockText: {
+    color: COLORS.textMuted,
+    ...TYPOGRAPHY.caption,
+  },
+
+  cardAction: {
+    marginLeft: SPACING.md,
+  },
+
+  miniBtn: {
+    width: 76,
+    height: 40,
+
+    borderRadius: SIZES.radiusSm,
+  },
+
+  // =========================================================
+  // MAP MARKERS
+  // =========================================================
+
+  customMarker: {
+    width: 34,
+    height: 34,
+
+    padding: 5,
+
+    borderRadius: SIZES.radiusFull,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    backgroundColor: COLORS.surface,
+
+    borderWidth: 2.5,
+
+    ...SHADOWS.medium,
+  },
+
+  markerText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  borderSuccess: {
+    borderColor: COLORS.success,
+  },
+
+  borderWarning: {
+    borderColor: COLORS.warning,
+  },
+
+  markerWrap: {
+    padding: 6,
+  },
+
+  // Active offer count of a restaurant marker
+  markerCountBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+
+    borderRadius: SIZES.radiusFull,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: COLORS.primary,
+  },
+
+  markerCountText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // =========================================================
+  // COLOR HELPERS
+  // =========================================================
+
+  bgSuccess: {
+    backgroundColor: COLORS.success,
+  },
+
+  bgWarning: {
+    backgroundColor: COLORS.warning,
+  },
+
+  textSuccess: {
+    color: COLORS.success,
+  },
+
+  textWarning: {
+    color: COLORS.warning,
+  },
+
+  // =========================================================
+  // QR SUCCESS MODAL
+  // =========================================================
+
+  modalOverlay: {
+    flex: 1,
+
+    backgroundColor: COLORS.overlay,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    padding: SPACING.xxl,
+  },
+
+  modalCard: {
+    width: '100%',
+
+    padding: SPACING.xxxl,
+
+    alignItems: 'center',
+
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusXl,
+
+    ...SHADOWS.heavy,
+  },
+
+  modalTitleSuccess: {
+    color: COLORS.primary,
+
+    marginBottom: SPACING.lg,
+
+    ...TYPOGRAPHY.title,
+
+    textAlign: 'center',
+  },
+
+  modalInfoText: {
+    color: COLORS.textSub,
+
+    textAlign: 'center',
+
+    marginBottom: SPACING.xxl,
+
+    lineHeight: 21,
+
+    ...TYPOGRAPHY.body,
+  },
+
+  qrCodeWrapper: {
+    padding: SPACING.xl,
+
+    marginBottom: SPACING.xxl,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radiusMd,
+  },
 });

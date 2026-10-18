@@ -3,6 +3,7 @@ from firebase_admin import credentials, messaging
 import os
 from app.extensions import db
 from sqlalchemy import text
+from app.utils.constants import STUDENT_ROLES
 
 # Initialize Firebase Admin SDK only once
 if not firebase_admin._apps:
@@ -17,6 +18,14 @@ if not firebase_admin._apps:
         print(f"⚠️ Firebase initialization error: {e}")
 
 class NotificationService:
+
+    @staticmethod
+    def new_offer_recipients():
+        """Every student account (canonical 'student' and legacy 'user') except suspended ones: a suspended
+        account can't sign in or claim, so it gets no pushes or inbox rows either (same rule as is_account_suspended)."""
+        from app.models.user import User
+        return User.query.filter(User.role.in_(STUDENT_ROLES),
+                                 User.verification_status.is_distinct_from('suspended')).all()
 
     @staticmethod
     def send_push_notification(fcm_token, title, body, data_payload=None):
@@ -45,15 +54,13 @@ class NotificationService:
         
         try:
             # 1. Extract data safely from the payload
-            restaurant_id = offer_data.get('restaurant_id')
             offer_title = offer_data.get('title', 'Delicious Meal')
+
+            # The caller (QRService.create_offer) passes the restaurant's name
+            restaurant_name = offer_data.get('restaurant_name') or "A Local Restaurant"
             
-            # Fetch restaurant name
-            restaurant = User.query.get(restaurant_id)
-            restaurant_name = restaurant.name if restaurant else "A Local Restaurant"
-            
-            # 2. Get all active students from the database
-            students = User.query.filter_by(role='student').all()
+            # 2. Get all students from the database (both student roles)
+            students = NotificationService.new_offer_recipients()
             success_count = 0
             
             print(f"🚀 Found {len(students)} students. Sending notifications...")

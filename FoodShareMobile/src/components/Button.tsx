@@ -1,103 +1,197 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { COLORS, SIZES, SHADOWS } from '../constants/theme';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import { COLORS, SIZES, SHADOWS, SPACING } from '../constants/theme';
+
+type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'danger'
+  | 'success'
+  | 'dangerSoft';
+
+// 'sm' is the compact in-card size (claim buttons); 'md' is the default full-size button
+type ButtonSize = 'sm' | 'md';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   loading?: boolean;
   disabled?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
-  icon?: string; 
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle | TextStyle[];
+  icon?: React.ReactNode;
 }
 
-export const Button = ({ 
-  title, 
-  onPress, 
-  variant = 'primary', 
-  loading = false, 
+export const Button: React.FC<ButtonProps> = ({
+  title,
+  onPress,
+  loading = false,
   disabled = false,
+  variant = 'primary',
+  size = 'md',
   style,
   textStyle,
-  icon
-}: ButtonProps) => {
-  
-  // Define background color based on variant
-  const getBgColor = () => {
-    if (disabled) return COLORS.border;
+  icon,
+}) => {
+  const isDisabled = disabled || loading;
+
+  const getBackgroundColor = () => {
     switch (variant) {
-      case 'primary': return COLORS.primary;
-      case 'secondary': return COLORS.secondary;
-      case 'danger': return COLORS.danger;
-      case 'outline': return 'transparent';
-      case 'ghost': return 'transparent';
-      default: return COLORS.primary;
+      case 'secondary':
+        return COLORS.secondary;
+      case 'outline':
+      case 'ghost':
+        return 'transparent';
+      case 'danger':
+        return COLORS.danger;
+      case 'success':
+        return COLORS.success;
+      case 'dangerSoft':
+        return COLORS.dangerLight;
+      case 'primary':
+      default:
+        return COLORS.primary;
     }
   };
 
-  // Define text color based on variant
   const getTextColor = () => {
-    if (disabled) return COLORS.textSub;
     switch (variant) {
-      case 'outline': return COLORS.textMain; // Outline texts are usually dark for social logins
-      case 'ghost': return COLORS.textSub;
-      default: return COLORS.white;
+      case 'outline':
+        return COLORS.primary;
+      case 'ghost':
+        return COLORS.textMain;
+      case 'dangerSoft':
+        return COLORS.danger;
+      case 'primary':
+      case 'secondary':
+      case 'danger':
+      default:
+        return COLORS.white;
     }
   };
 
-  // Define border styles for outline buttons
-  const getBorder = () => {
-    if (variant === 'outline') return { borderWidth: 1.5, borderColor: COLORS.border };
-    return {};
+  const getLoaderColor = () => {
+    if (variant === 'dangerSoft') return COLORS.danger;
+    return variant === 'outline' || variant === 'ghost'
+      ? COLORS.primary
+      : COLORS.white;
+  };
+
+  const getBorderColor = () => {
+    if (variant === 'outline') return COLORS.primary;
+    if (variant === 'dangerSoft') return DANGER_SOFT_BORDER;
+    return 'transparent';
   };
 
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
-      style={[
-        styles.container,
-        { backgroundColor: getBgColor() },
-        getBorder(),
-        (variant === 'primary' || variant === 'secondary') && !disabled ? SHADOWS.medium : {},
-        style
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      style={({ pressed }) => [
+        styles.base,
+        size === 'sm' && styles.sm,
+        {
+          backgroundColor: getBackgroundColor(),
+          borderColor: getBorderColor(),
+          opacity: isDisabled ? 0.55 : pressed ? 0.88 : 1,
+        },
+        variant === 'outline' && styles.outline,
+        variant === 'ghost' && styles.ghost,
+        variant !== 'ghost' &&
+          variant !== 'outline' &&
+          variant !== 'dangerSoft' &&
+          SHADOWS.light,
+        style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? COLORS.primary : '#FFF'} />
+        <ActivityIndicator
+          size="small"
+          color={getLoaderColor()}
+        />
       ) : (
         <>
-          {icon && <Text style={[styles.icon, { color: getTextColor() }]}>{icon}</Text>}
-          <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
+          {icon}
+          <Text
+            style={[
+              styles.text,
+              size === 'sm' && styles.textSm,
+              { color: getTextColor() },
+              icon ? styles.textWithIcon : undefined,
+              textStyle,
+            ]}
+          >
             {title}
           </Text>
         </>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
-// --- STYLES ---
+const DANGER_SOFT_BORDER = '#F6C9C4';
+
 const styles = StyleSheet.create({
-  container: {
-    height: 56,
-    borderRadius: SIZES.radius,
+  sm: {
+    minHeight: 40,
+    minWidth: 80,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: SIZES.radiusSm,
+  },
+
+  textSm: {
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+
+  base: {
+    minHeight: 50,
+    paddingHorizontal: SPACING.xxl,
+    paddingVertical: SPACING.md,
+    borderRadius: SIZES.radiusMd,
+    borderWidth: 1,
+
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 12, // Slight increase for better spacing between stacked buttons
   },
+
+  outline: {
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.light,
+  },
+
+  ghost: {
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderWidth: 0,
+  },
+
   text: {
-    fontSize: SIZES.medium,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
+    textAlign: 'center',
   },
-  icon: {
-    fontSize: 18,
-    marginRight: 10,
-  }
+
+  textWithIcon: {
+    marginLeft: SPACING.sm,
+  },
 });
+
+export default Button;

@@ -1,159 +1,1003 @@
-// --- STYLES FOR PROFILE SCREEN ---
 import { StyleSheet } from 'react-native';
-import { COLORS, SHADOWS } from '../../../constants/theme';
+
+import {
+  COLORS,
+  SHADOWS,
+  SIZES,
+  SPACING,
+  TYPOGRAPHY,
+} from '../../../constants/theme';
 
 export const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: COLORS.textSub, fontWeight: '600', letterSpacing: 0.5 },
-  headerWrapper: { padding: 24, paddingBottom: 0 },
-  
-  // Profile Header Elements
-  profileSection: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-  avatarContainer: { width: 80, height: 80, borderRadius: 24, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginRight: 16, borderWidth: 3, borderColor: '#FFFFFF', ...SHADOWS.medium },
-  avatarText: { fontSize: 32, color: '#FFFFFF', fontWeight: '900' },
-  editIconBtn: { position: 'absolute', bottom: -5, right: -5, backgroundColor: '#FFFFFF', padding: 6, borderRadius: 12, borderWidth: 1, borderColor: '#EEEEEE', ...SHADOWS.light },
-  editIconText: { fontSize: 12, fontWeight: '900', color: COLORS.textMain, marginTop: -2 },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 24, fontWeight: '900', color: COLORS.textMain, marginBottom: 4, letterSpacing: -0.5 },
-  userEmail: { fontSize: 13, color: COLORS.textSub, marginBottom: 12, fontWeight: '500' },
-  
-  // Badges
-  badgeRow: { flexDirection: 'row' },
-  roleBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  roleText: { fontSize: 10, color: COLORS.textSub, fontWeight: '800', letterSpacing: 0.5 },
-  rankBadge: { backgroundColor: '#FFF0F0', marginLeft: 8 },
-  rankText: { fontSize: 10, color: COLORS.primary, fontWeight: '900', letterSpacing: 0.5 },
-  badgeVerified: { backgroundColor: '#E8F5E9' }, 
-  textVerified: { color: COLORS.success },
-  badgePending: { backgroundColor: '#FFF8E1' }, 
-  textPending: { color: '#F59E0B' },
-  badgeUnverified: { backgroundColor: '#FEE2E2' }, 
-  textUnverified: { color: COLORS.danger },
-  
-  // Verification Banner
-  verificationBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#FEE2E2', ...SHADOWS.light },
-  bannerIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FECACA', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  bannerIconText: { fontSize: 18, fontWeight: '900', color: COLORS.danger },
-  bannerTextContent: { flex: 1 },
-  bannerTitle: { fontSize: 13, fontWeight: '800', color: COLORS.danger, marginBottom: 2 },
-  bannerSub: { fontSize: 11, color: '#991B1B', fontWeight: '500' },
-  bannerArrow: { fontSize: 16, color: COLORS.danger, fontWeight: '900', marginLeft: 8 },
-  
-  // Progress Bar
-  progressContainer: { marginBottom: 24, paddingHorizontal: 4 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  levelText: { fontSize: 12, fontWeight: '800', color: COLORS.textMain, textTransform: 'uppercase', letterSpacing: 0.5 },
-  pointsText: { fontSize: 12, fontWeight: '800', color: COLORS.primary },
-  progressBarBg: { height: 8, backgroundColor: '#EEEEEE', borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 4 },
-  
-  // Main Stats Card
-  statsCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, marginBottom: 24, borderWidth: 1, borderColor: '#F0F0F0', ...SHADOWS.light },
-  statsTitle: { fontSize: 14, fontWeight: '800', color: COLORS.textMain, marginBottom: 20, letterSpacing: 0.5, textTransform: 'uppercase' },
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statItem: { alignItems: 'center', flex: 1 },
-  statValue: { fontSize: 24, fontWeight: '900', color: COLORS.textMain, letterSpacing: -0.5 },
-  statLabel: { fontSize: 10, color: COLORS.textSub, marginTop: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  verticalLine: { width: 1, height: 40, backgroundColor: '#F0F0F0' },
-  
-  // Detailed Stats Banner
-  detailedStatsWrapper: { marginHorizontal: 0, marginBottom: 24, alignItems: 'center' },
-  detailedStatsContainer: { flexDirection: 'row', width: '100%', height: 80, borderRadius: 16, overflow: 'hidden' },
-  detailedStatHalf: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  detailedStatTitle: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  detailedStatValue: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', marginTop: 4 },
-  totalBadgeContainer: { position: 'absolute', bottom: -10, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 4, borderRadius: 12, ...SHADOWS.light },
-  totalBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.textMain },
-  
-  // Quick Menu
-  quickMenu: { marginBottom: 24 },
-  menuChip: { backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginRight: 12, borderWidth: 1, borderColor: '#EEEEEE', ...SHADOWS.light },
-  menuText: { fontSize: 11, fontWeight: '800', color: COLORS.textMain, letterSpacing: 0.5 },
-  
-  // Filter Tabs
-  tabsContainer: { flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: 14, padding: 6, marginBottom: 20 },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
-  tabActive: { backgroundColor: '#FFFFFF', ...SHADOWS.light },
-  tabText: { fontSize: 12, color: COLORS.textSub, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  tabTextActive: { color: COLORS.primary, fontWeight: '900' },
-  
-  // List Sections
-  listSection: { marginBottom: 24 },
-  sectionHeaderTitle: { fontSize: 18, fontWeight: '900', marginLeft: 24, marginBottom: 12, letterSpacing: -0.5 },
-  
-  // History Cards
-  historyCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', marginBottom: 16, borderRadius: 20, overflow: 'hidden', height: 86, alignItems: 'center', marginHorizontal: 24, borderWidth: 1, borderColor: '#F5F5F5', ...SHADOWS.light },
-  cardStrip: { width: 6, height: '100%' },
-  cardIconBox: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginLeft: 16, marginRight: 16 },
-  cardIconLetter: { fontSize: 20, fontWeight: '900' },
-  cardContent: { flex: 1, paddingVertical: 10, justifyContent: 'center' },
-  restName: { fontSize: 15, fontWeight: '800', color: COLORS.textMain, marginBottom: 4, letterSpacing: -0.3 },
-  offerName: { fontSize: 13, color: COLORS.textSub, marginBottom: 6, fontWeight: '500' },
-  typeLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  typeIndicatorDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  typeLabelText: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  dateLabelText: { fontSize: 11, fontWeight: '700', color: COLORS.textMain, marginLeft: 4 },
-  dateTextLarge: { fontSize: 14, color: COLORS.textMain, fontWeight: '900', marginTop: 6, letterSpacing: -0.3 },
-  cardAction: { width: 76, alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#F5F5F5', height: '60%', justifyContent: 'center' },
-  statusCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  statusCircleIcon: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  statusLabelText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  
-  // Empty State
-  emptyBox: { alignItems: 'center', marginTop: 40, paddingHorizontal: 40 },
-  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  emptyIconText: { fontSize: 28, fontWeight: '900', color: '#CCCCCC' },
-  emptyTitle: { fontSize: 14, fontWeight: '600', color: COLORS.textSub, textAlign: 'center', lineHeight: 22 },
-  
-  // Footer
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, backgroundColor: 'rgba(255,255,255,0.95)', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
-  logoutBtn: { backgroundColor: '#FFF0F0', borderWidth: 1, borderColor: '#FFE5E5', borderRadius: 16, height: 56 },
-  logoutText: { color: COLORS.danger, fontWeight: '800', fontSize: 15, letterSpacing: 0.5 },
-  
-  // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(31, 41, 51, 0.4)', justifyContent: 'flex-end', alignItems: 'center' },
-  verificationModalCard: { width: '100%', backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, alignItems: 'center', ...SHADOWS.heavy },
-  docModalSub: { fontSize: 13, color: COLORS.textSub, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
-  docTypeContainer: { width: '100%', marginBottom: 24 },
-  docTypeBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#F9FAFB', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#F3F4F6' },
-  docTypeBtnActive: { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
-  docRadioBtn: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', marginRight: 12, justifyContent: 'center', alignItems: 'center' },
-  docRadioBtnActive: { borderColor: COLORS.primary },
-  docRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary },
-  docTypeText: { fontSize: 14, fontWeight: '600', color: COLORS.textMain },
-  docTypeTextActive: { color: COLORS.primary, fontWeight: '800' },
-  docImageContainer: { width: '100%', marginBottom: 24 },
-  docUploadBtn: { width: '100%', height: 120, borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
-  docUploadIcon: { fontSize: 32, marginBottom: 8 },
-  docUploadText: { fontSize: 13, fontWeight: '700', color: COLORS.textSub },
-  docPreviewWrapper: { width: '100%', alignItems: 'center' },
-  docPreviewImage: { width: '100%', height: 160, borderRadius: 16, marginBottom: 12 },
-  docChangeBtn: { paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#F3F4F6', borderRadius: 8 },
-  docChangeText: { fontSize: 12, fontWeight: '800', color: COLORS.textMain },
-  modalCard: { width: '100%', backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, alignItems: 'center', ...SHADOWS.heavy },
-  modalHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: COLORS.textMain, letterSpacing: -0.5 },
-  closeIconText: { fontSize: 20, color: '#A0A0A0', fontWeight: '900' },
-  qrContainer: { padding: 24, backgroundColor: '#F8F9FA', borderRadius: 24, marginBottom: 24, width: '100%', alignItems: 'center' },
-  qrData: { fontSize: 24, fontWeight: '900', letterSpacing: 2, color: COLORS.textMain },
-  modalInfo: { textAlign: 'center', color: COLORS.textSub, fontSize: 14, lineHeight: 22, fontWeight: '500', marginBottom: 24 },
-  modalActionBtn: { width: '100%', height: 56, borderRadius: 16 },
-  langModalCard: { backgroundColor: '#FFFFFF', width: '100%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, alignItems: 'center', ...SHADOWS.heavy },
-  langBtn: { width: '100%', padding: 20, borderRadius: 16, backgroundColor: '#FFFFFF', marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
-  langBtnActive: { backgroundColor: '#F5FBFF', borderColor: COLORS.primary },
-  langText: { fontSize: 16, fontWeight: '700', color: COLORS.textMain },
-  langTextActive: { color: COLORS.primary, fontWeight: '900' },
-  langBadge: { backgroundColor: '#F5F5F5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  langBadgeActive: { backgroundColor: COLORS.primary },
-  langBadgeText: { fontSize: 12, fontWeight: '800', color: COLORS.textSub },
-  langBadgeTextActive: { color: '#FFFFFF' },
-  notifModalCard: { backgroundColor: '#FFFFFF', width: '100%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, alignItems: 'center', ...SHADOWS.heavy },
-  notifScrollView: { width: '100%', maxHeight: 400 },
-  notifCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  notifTextContainer: { flex: 1, paddingRight: 16 },
-  notifTitle: { fontSize: 14, fontWeight: '800', color: COLORS.textMain, marginBottom: 4 },
-  notifBody: { fontSize: 12, color: COLORS.textSub, marginBottom: 6, lineHeight: 18 },
-  notifTime: { fontSize: 10, color: '#A0A0A0', fontWeight: '700' },
-  notifUnreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary }
+  // ======================================================
+  // SCREEN
+  // ======================================================
+
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  centerBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xxl,
+  },
+
+  loadingText: {
+    marginTop: SPACING.md,
+    color: COLORS.textSub,
+    ...TYPOGRAPHY.bodyMedium,
+  },
+
+  headerWrapper: {
+    paddingHorizontal: SPACING.xxl,
+    paddingTop: SPACING.lg,
+    paddingBottom: 0,
+  },
+
+  // ======================================================
+  // PROFILE HEADER
+  // ======================================================
+
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xxl,
+  },
+
+  avatarContainer: {
+    width: 82,
+    height: 82,
+
+    borderRadius: SIZES.radiusXl,
+
+    backgroundColor: COLORS.primary,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: SPACING.lg,
+
+    borderWidth: 3,
+    borderColor: COLORS.surface,
+
+    ...SHADOWS.medium,
+  },
+
+  avatarText: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+
+  editIconBtn: {
+    position: 'absolute',
+
+    bottom: -5,
+    right: -5,
+
+    width: 30,
+    height: 30,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.surface,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  userInfo: {
+    flex: 1,
+  },
+
+  userName: {
+    color: COLORS.textMain,
+
+    ...TYPOGRAPHY.title,
+
+    fontSize: 22,
+
+    marginBottom: 4,
+  },
+
+  userEmail: {
+    color: COLORS.textSub,
+
+    fontSize: 13,
+    fontWeight: '500',
+
+    marginBottom: SPACING.md,
+  },
+
+  // ======================================================
+  // BADGES
+  // ======================================================
+
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+
+  roleBadge: {
+    backgroundColor: COLORS.surfaceMuted,
+
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+
+    borderRadius: SIZES.radiusFull,
+  },
+
+  roleText: {
+    fontSize: 11,
+    color: COLORS.textSub,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  badgeVerified: {
+    backgroundColor: COLORS.successLight,
+  },
+
+  textVerified: {
+    color: COLORS.success,
+  },
+
+  badgePending: {
+    backgroundColor: COLORS.warningLight,
+  },
+
+  textPending: {
+    color: COLORS.warningText,
+  },
+
+  badgeUnverified: {
+    backgroundColor: COLORS.dangerLight,
+  },
+
+  textUnverified: {
+    color: COLORS.danger,
+  },
+
+  // ======================================================
+  // VERIFICATION BANNER
+  // ======================================================
+
+  verificationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    backgroundColor: COLORS.dangerLight,
+
+    padding: SPACING.lg,
+
+    borderRadius: SIZES.radiusMd,
+
+    marginBottom: SPACING.xxl,
+
+    borderWidth: 1,
+    borderColor: '#F6C9C4',
+
+    ...SHADOWS.light,
+  },
+
+  bannerIconBox: {
+    width: 38,
+    height: 38,
+
+    borderRadius: SIZES.radius,
+
+    backgroundColor: '#F9D8D4',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginRight: SPACING.md,
+  },
+
+  bannerTextContent: {
+    flex: 1,
+  },
+
+  bannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+
+    color: COLORS.danger,
+
+    marginBottom: 3,
+  },
+
+  bannerSub: {
+    fontSize: 11,
+    lineHeight: 17,
+
+    color: '#9E3B32',
+
+    fontWeight: '500',
+  },
+
+  bannerArrow: {
+    fontSize: 18,
+    color: COLORS.danger,
+    fontWeight: '700',
+    marginLeft: SPACING.sm,
+  },
+
+  // ======================================================
+  // XP / LEVEL PROGRESS
+  // ======================================================
+
+  progressContainer: {
+    marginBottom: SPACING.xxl,
+
+    paddingHorizontal: SPACING.xs,
+  },
+
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+
+    marginBottom: SPACING.sm,
+  },
+
+  levelText: {
+    color: COLORS.textMain,
+
+    fontSize: 12,
+    fontWeight: '700',
+
+    letterSpacing: 0.3,
+  },
+
+  pointsText: {
+    color: COLORS.primary,
+
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  progressBarBg: {
+    height: 9,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radiusFull,
+
+    overflow: 'hidden',
+  },
+
+  progressBarFill: {
+    height: '100%',
+
+    backgroundColor: COLORS.primary,
+
+    borderRadius: SIZES.radiusFull,
+  },
+
+  // ======================================================
+  // MAIN STATS
+  // ======================================================
+
+  statsCard: {
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusXl,
+
+    padding: SPACING.xxl,
+
+    marginBottom: SPACING.xxl,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  statsTitle: {
+    color: COLORS.textMain,
+
+    fontSize: 13,
+    fontWeight: '800',
+
+    marginBottom: SPACING.xl,
+
+    letterSpacing: 0.3,
+  },
+
+  statsGrid: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    letterSpacing: -0.5,
+  },
+
+  statLabel: {
+    fontSize: 11,
+
+    color: COLORS.textMuted,
+
+    marginTop: 5,
+
+    fontWeight: '700',
+
+    letterSpacing: 0.3,
+  },
+
+  verticalLine: {
+    width: 1,
+    height: 42,
+
+    backgroundColor: COLORS.divider,
+  },
+
+  // ======================================================
+  // QUICK ACTIONS
+  // ======================================================
+
+  quickMenu: {
+    marginBottom: SPACING.xxl,
+  },
+
+  menuChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    backgroundColor: COLORS.surface,
+
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 11,
+
+    borderRadius: SIZES.radiusFull,
+
+    marginRight: SPACING.sm,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
+  },
+
+  menuText: {
+    fontSize: 11,
+
+    fontWeight: '700',
+
+    color: COLORS.textSub,
+
+    letterSpacing: 0.3,
+  },
+
+  // ======================================================
+  // HISTORY TABS
+  // ======================================================
+
+  tabsContainer: {
+    flexDirection: 'row',
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radius,
+
+    padding: 4,
+
+    marginBottom: SPACING.lg,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  tabBtn: {
+    flex: 1,
+
+    paddingVertical: 11,
+
+    alignItems: 'center',
+
+    borderRadius: SIZES.radiusSm,
+  },
+
+  tabActive: {
+    backgroundColor: COLORS.surface,
+
+    ...SHADOWS.light,
+  },
+
+  tabText: {
+    fontSize: 11,
+
+    color: COLORS.textMuted,
+
+    fontWeight: '700',
+
+    letterSpacing: 0.3,
+  },
+
+  tabTextActive: {
+    color: COLORS.primary,
+
+    fontWeight: '800',
+  },
+
+  // ======================================================
+  // LIST SECTIONS
+  // ======================================================
+
+  listSection: {
+    marginBottom: SPACING.xxl,
+  },
+
+  sectionHeaderTitle: {
+    fontSize: 18,
+
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    marginLeft: SPACING.xxl,
+    marginBottom: SPACING.md,
+
+    letterSpacing: -0.2,
+  },
+
+  // ======================================================
+  // HISTORY CARDS
+  // ======================================================
+
+  historyCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+
+  height: 96,
+
+  backgroundColor: COLORS.surface,
+
+  marginBottom: SPACING.md,
+  marginHorizontal: SPACING.xxl,
+
+  borderRadius: SIZES.radiusMd,
+
+  overflow: 'hidden',
+
+  borderWidth: 1,
+  borderColor: COLORS.border,
+
+  ...SHADOWS.light,
+},
+
+  cardStrip: {
+    width: 5,
+    height: '100%',
+  },
+
+  cardIconBox: {
+    width: 48,
+    height: 48,
+
+    borderRadius: SIZES.radius,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginLeft: SPACING.lg,
+    marginRight: SPACING.md,
+  },
+
+  cardIconLetter: {
+    fontSize: 19,
+
+    fontWeight: '800',
+  },
+
+  cardContent: {
+  flex: 1,
+
+  paddingVertical: SPACING.sm,
+
+  justifyContent: 'center',
+
+  minWidth: 0,
+},
+
+  restName: {
+    fontSize: 15,
+
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    marginBottom: 3,
+  },
+
+  offerName: {
+    fontSize: 12,
+
+    color: COLORS.textSub,
+
+    marginBottom: 4,
+
+    fontWeight: '500',
+  },
+
+  typeLabelRow: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    marginTop: 4,
+  },
+
+  typeIndicatorDot: {
+    width: 6,
+    height: 6,
+
+    borderRadius: SIZES.radiusFull,
+
+    marginRight: 6,
+  },
+
+  typeLabelText: {
+    fontSize: 11,
+
+    fontWeight: '800',
+
+    letterSpacing: 0.3,
+  },
+
+  dateLabelText: {
+    fontSize: 11,
+
+    fontWeight: '600',
+
+    color: COLORS.textMuted,
+
+    marginLeft: 4,
+  },
+
+  dateTextLarge: {
+    fontSize: 13,
+
+    color: COLORS.textMain,
+
+    fontWeight: '800',
+
+    marginTop: 4,
+  },
+
+  cardAction: {
+  width: 76,
+  height: '100%',
+
+  alignItems: 'center',
+  justifyContent: 'center',
+
+  borderLeftWidth: 1,
+  borderLeftColor: COLORS.divider,
+},
+
+  statusCircle: {
+    width: 38,
+    height: 38,
+
+    borderRadius: SIZES.radiusFull,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    marginBottom: 3,
+  },
+
+  // 10px (not 11): HU "FOLYAMATBAN" must fit the 76px status column
+  statusLabelText: {
+    fontSize: 10,
+
+    fontWeight: '800',
+  },
+
+  // ======================================================
+  // FOOTER / LOGOUT
+  // ======================================================
+
+  footer: {
+  paddingHorizontal: SPACING.xxl,
+  paddingTop: SPACING.lg,
+  paddingBottom: SPACING.xxl,
+  backgroundColor: COLORS.background,
+},
+
+  logoutBtn: {
+    height: 52,
+  },
+
+  deleteAccountBtn: {
+    marginTop: SPACING.md,
+    borderColor: COLORS.danger,
+    height: 52,
+  },
+
+  logoutText: {
+    color: COLORS.danger,
+
+    fontWeight: '700',
+
+    fontSize: 14,
+
+    letterSpacing: 0.2,
+  },
+
+  // ======================================================
+  // MODALS
+  // ======================================================
+
+  docModalSub: {
+    fontSize: 13,
+
+    color: COLORS.textSub,
+
+    textAlign: 'center',
+
+    marginBottom: SPACING.xxl,
+
+    lineHeight: 20,
+  },
+
+  docTypeContainer: {
+    width: '100%',
+
+    marginBottom: SPACING.xxl,
+  },
+
+  docTypeBtn: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    padding: SPACING.lg,
+
+    backgroundColor: COLORS.surfaceSecondary,
+
+    borderRadius: SIZES.radius,
+
+    marginBottom: SPACING.sm,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  docTypeBtnActive: {
+    backgroundColor: COLORS.infoLight,
+
+    borderColor: '#B7D7DE',
+  },
+
+  docRadioBtn: {
+    width: 20,
+    height: 20,
+
+    borderRadius: SIZES.radiusFull,
+
+    borderWidth: 2,
+
+    borderColor: COLORS.borderStrong,
+
+    marginRight: SPACING.md,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  docRadioBtnActive: {
+    borderColor: COLORS.primary,
+  },
+
+  docRadioInner: {
+    width: 10,
+    height: 10,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.primary,
+  },
+
+  docTypeText: {
+    fontSize: 14,
+
+    fontWeight: '600',
+
+    color: COLORS.textMain,
+  },
+
+  docTypeTextActive: {
+    color: COLORS.primary,
+
+    fontWeight: '800',
+  },
+
+  docImageContainer: {
+    width: '100%',
+
+    marginBottom: SPACING.xxl,
+  },
+
+  docUploadBtn: {
+    width: '100%',
+    height: 120,
+
+    borderRadius: SIZES.radiusMd,
+
+    borderWidth: 1.5,
+    borderColor: COLORS.borderStrong,
+    borderStyle: 'dashed',
+
+    backgroundColor: COLORS.surfaceSecondary,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  docUploadIcon: {
+    fontSize: 30,
+
+    marginBottom: SPACING.sm,
+  },
+
+  docUploadText: {
+    fontSize: 13,
+
+    fontWeight: '700',
+
+    color: COLORS.textSub,
+  },
+
+  docPreviewWrapper: {
+    width: '100%',
+
+    alignItems: 'center',
+  },
+
+  docPreviewImage: {
+    width: '100%',
+    height: 160,
+
+    borderRadius: SIZES.radiusMd,
+
+    marginBottom: SPACING.md,
+  },
+
+  docChangeBtn: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radiusSm,
+  },
+
+  docChangeText: {
+    fontSize: 12,
+
+    fontWeight: '700',
+
+    color: COLORS.textMain,
+  },
+
+  qrContainer: {
+    padding: SPACING.xxl,
+
+    backgroundColor: COLORS.surfaceMuted,
+
+    borderRadius: SIZES.radiusLg,
+
+    marginBottom: SPACING.xxl,
+
+    width: '100%',
+
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  qrData: {
+    fontSize: 24,
+
+    fontWeight: '800',
+
+    letterSpacing: 2,
+
+    color: COLORS.textMain,
+  },
+
+  modalInfo: {
+    textAlign: 'center',
+
+    color: COLORS.textSub,
+
+    fontSize: 14,
+
+    lineHeight: 21,
+
+    fontWeight: '500',
+
+    marginBottom: SPACING.xxl,
+  },
+
+  modalActionBtn: {
+    width: '100%',
+
+    height: 54,
+
+    borderRadius: SIZES.radius,
+
+  },
+
+  // ======================================================
+  // LANGUAGE MODAL
+  // ======================================================
+
+  langBtn: {
+    width: '100%',
+
+    padding: SPACING.lg,
+
+    borderRadius: SIZES.radiusMd,
+
+    backgroundColor: COLORS.surface,
+
+    marginBottom: SPACING.sm,
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+
+    alignItems: 'center',
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  langBtnActive: {
+    backgroundColor: COLORS.primaryLight,
+
+    borderColor: '#E5C2BB',
+  },
+
+  langText: {
+    fontSize: 15,
+
+    fontWeight: '600',
+
+    color: COLORS.textMain,
+  },
+
+  langTextActive: {
+    color: COLORS.primary,
+
+    fontWeight: '800',
+  },
+
+  langBadge: {
+    backgroundColor: COLORS.surfaceMuted,
+
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+
+    borderRadius: SIZES.radiusFull,
+  },
+
+  langBadgeActive: {
+    backgroundColor: COLORS.primary,
+  },
+
+  langBadgeText: {
+    fontSize: 11,
+
+    fontWeight: '700',
+
+    color: COLORS.textSub,
+  },
+
+  langBadgeTextActive: {
+    color: COLORS.white,
+  },
+
+  // ======================================================
+  // NOTIFICATIONS MODAL
+  // ======================================================
+
+  notifScrollView: {
+    width: '100%',
+
+    maxHeight: 400,
+  },
+
+  notifCard: {
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+
+    alignItems: 'center',
+
+    paddingVertical: SPACING.lg,
+
+    borderBottomWidth: 1,
+
+    borderBottomColor: COLORS.divider,
+  },
+
+  notifTextContainer: {
+    flex: 1,
+
+    paddingRight: SPACING.lg,
+  },
+
+  notifTitle: {
+    fontSize: 14,
+
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    marginBottom: 4,
+  },
+
+  notifBody: {
+    fontSize: 12,
+
+    color: COLORS.textSub,
+
+    marginBottom: 6,
+
+    lineHeight: 18,
+  },
+
+  notifTime: {
+    fontSize: 11,
+
+    color: COLORS.textMuted,
+
+    fontWeight: '600',
+  },
+
+  notifLoadingBox: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.xxl,
+  },
+
+  notifEmpty: {
+    marginTop: 0,
+    paddingBottom: SPACING.lg,
+  },
+
+  notifUnreadDot: {
+    width: 9,
+    height: 9,
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.primary,
+  },
 });

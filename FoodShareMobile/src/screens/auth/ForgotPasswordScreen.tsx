@@ -1,127 +1,192 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView 
+import {
+  View,
+  Text,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
 import { useAuth } from '../../context/AuthContext';
 import { client } from '../../api/client';
+
 import { COLORS } from '../../constants/theme';
+import { styles } from './recoveryStyles';
+
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Header } from '../../components/Header';
+import { apiErrorKey } from '../../utils/apiErrors';
 
 const ForgotPasswordScreen = ({ navigation }: any) => {
-  // --- HOOKS ---
   const { t } = useAuth();
-  
-  // --- STATE MANAGEMENT ---
+
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- ACTIONS ---
-  /**
-   * Handles the password reset request by sending the email to the backend API.
-   * If successful, it shows a success alert and navigates back to the login screen.
-   */
   const handleResetPassword = async () => {
     if (!email) {
-      Alert.alert(t('error') || "Error", t('invalid_email') || "Please enter your email.");
+      Alert.alert(
+        t('error') || 'Error',
+        t('invalid_email') ||
+          'Please enter your email.',
+      );
       return;
     }
 
     setIsLoading(true);
+
     try {
-      // API call to our Python backend to trigger the actual email sending process
-      const response = await client.post('/auth/forgot-password', { email });
-      
+      const response = await client.post(
+        '/auth/forgot-password',
+        { email },
+      );
+
       if (response.data.success) {
-        Alert.alert("Success", t('reset_sent_success'), [
-          { text: "OK", onPress: () => navigation.goBack() }
-        ]);
+        Alert.alert(
+          t('success'),
+          t('reset_sent_success'),
+          [
+            {
+              text: t('ok'),
+              // Continue to the code entry screen; the email is carried over
+              onPress: () =>
+                navigation.navigate('ResetPassword', { email }),
+            },
+          ],
+        );
       }
     } catch (error: any) {
-      // Capture and display any errors returned by the backend (e.g., User not found)
-      const msg = error.response?.data?.message || "Something went wrong. Please try again.";
-      Alert.alert(t('error') || "Error", msg);
+      const msg = t(apiErrorKey(error, 'generic_error'));
+
+      Alert.alert(
+        t('error') || 'Error',
+        msg,
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"} 
+    <KeyboardAvoidingView
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
+      }
       style={styles.container}
     >
-      {/* Top Navigation Header */}
-      <Header title="" onBack={() => navigation.goBack()} />
-      
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{t('forgot_title')}</Text>
-        <Text style={styles.sub}>{t('forgot_sub')}</Text>
+      <Header
+        title=""
+        onBack={() => navigation.goBack()}
+      />
 
-        <View style={styles.form}>
-          <Input 
-            label={t('email_ph')} 
-            placeholder="example@student.hu" 
-            value={email} 
-            onChangeText={setEmail} 
-            keyboardType="email-address" 
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ICON */}
+        <View style={styles.iconContainer}>
+          <Ionicons
+            name="lock-open-outline"
+            size={34}
+            color={COLORS.primary}
+          />
+        </View>
+
+        {/* TITLE */}
+        <Text style={styles.title}>
+          {t('forgot_title')}
+        </Text>
+
+        {/* DESCRIPTION */}
+        <Text style={styles.subtitle}>
+          {t('forgot_sub')}
+        </Text>
+
+        {/* FORM CARD */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIcon}>
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>
+                {t('recovery_email_title')}
+              </Text>
+
+              <Text style={styles.cardSubtitle}>
+                {t('recovery_email_sub')}
+              </Text>
+            </View>
+          </View>
+
+          <Input
+            label={t('email_ph')}
+            icon="mail-outline"
+            placeholder="example@student.hu"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
 
-          <View style={styles.buttonSpacing} />
+          <Button
+            title={t('send_reset_btn')}
+            onPress={handleResetPassword}
+            loading={isLoading}
+            variant="primary"
+            icon={
+              <Ionicons
+                name="paper-plane-outline"
+                size={18}
+                color={COLORS.white}
+              />
+            }
+          />
 
-          <Button 
-            title={t('send_reset_btn')} 
-            onPress={handleResetPassword} 
-            loading={isLoading} 
-            variant="primary" 
+          <Button
+            title={t('back_to_login')}
+            onPress={() =>
+              navigation.goBack()
+            }
+            variant="outline"
+            style={styles.backButton}
+            icon={
+              <Ionicons
+                name="arrow-back-outline"
+                size={18}
+                color={COLORS.primary}
+              />
+            }
           />
-          
-          <Button 
-            title={t('back_to_login')} 
-            onPress={() => navigation.goBack()} 
-            variant="outline" 
-            style={{ marginTop: 12 }}
+        </View>
+
+        {/* SECURITY NOTE */}
+        <View style={styles.securityNote}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={18}
+            color={COLORS.success}
           />
+
+          <Text style={styles.securityText}>
+            {t('recovery_security_note')}
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
-
-// --- STYLESHEET ---
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
-  },
-  content: { 
-    padding: 24, 
-    alignItems: 'center',
-    paddingTop: 40
-  },
-  title: { 
-    fontSize: 28, 
-    fontWeight: '700', 
-    color: COLORS.textMain, 
-    marginBottom: 12,
-    textAlign: 'center'
-  },
-  sub: { 
-    fontSize: 15, 
-    color: COLORS.textSub, 
-    marginBottom: 40, 
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 20
-  },
-  form: { 
-    width: '100%' 
-  },
-  buttonSpacing: {
-    height: 20
-  }
-});
 
 export default ForgotPasswordScreen;

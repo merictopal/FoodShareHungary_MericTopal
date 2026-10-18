@@ -49,11 +49,16 @@ export const offersApi = {
       name: photo.fileName || `offer-${offerId}.jpg`,
     } as any);
 
-    const uploadRes = await client.post('/upload/offer-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    return { ...createRes, upload_status: uploadRes };
+    // The offer exists (and students were notified) at this point: a failed photo upload must not be
+    // reported as a failed publish, or the user publishes again and creates a duplicate offer.
+    try {
+      const uploadRes = await client.post('/upload/offer-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return { ...createRes, upload_status: uploadRes, photoUploadFailed: false };
+    } catch {
+      return { ...createRes, photoUploadFailed: true };
+    }
   },
 
   // NEW: Fetches all active offers for the logged-in restaurant
@@ -74,12 +79,13 @@ export const offersApi = {
   // STUDENT ROUTES
   // ==========================================
 
-  getAll: (userId: number, lat: number, lng: number) => {
-    const params = new URLSearchParams({
-      user_id: userId.toString(),
-      lat: lat.toString(),
-      lng: lng.toString(),
-    });
+  // Coordinates only for a real device position (null = unknown: no distances, newest first)
+  getAll: (userId: number, location: { lat: number; lng: number } | null) => {
+    const params = new URLSearchParams({ user_id: userId.toString() });
+    if (location) {
+      params.append('lat', location.lat.toString());
+      params.append('lng', location.lng.toString());
+    }
     return client.get(`/offers?${params.toString()}`);
   },
 

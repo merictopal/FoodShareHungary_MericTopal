@@ -1,110 +1,117 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Platform, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
   StatusBar,
   ViewStyle,
-  TextStyle
+  TextStyle,
 } from 'react-native';
-import { COLORS, SHADOWS } from '../constants/theme';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {
+  COLORS,
+  SIZES,
+  SPACING,
+  SHADOWS,
+} from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
-// --- INTERFACES & TYPE DEFINITIONS ---
-// Defining rigorous types for all possible props to ensure bulletproof component usage.
 export interface HeaderProps {
-  /** The main title of the header */
   title: string;
-  
-  /** Callback function when the left back button is pressed. If omitted, back button is hidden. */
   onBack?: () => void;
-  
-  /** The icon to display on the right side. Accepts a string (typographic icon) or a React Node */
   rightIcon?: string | React.ReactNode;
-  
-  /** Callback function when the right icon is pressed */
   onRightPress?: () => void;
-  
-  /** Shows a tiny notification dot on the right icon if true */
+  // Screen-specific label for the right action (falls back to a generic one)
+  rightIconLabel?: string;
   showBadge?: boolean;
-  
-  /** If true, removes the background and borders. Useful for overlaying on maps or images (e.g., HomeScreen) */
   transparent?: boolean;
-  
-  /** Optional custom styles for the outer container */
   containerStyle?: ViewStyle;
-  
-  /** Optional custom styles for the title text */
   titleStyle?: TextStyle;
 }
 
-/**
- * Universal Header Component
- * Designed for both standard screens and transparent overlays.
- * Features enhanced accessibility and optimized touch targets.
- */
-export const Header = ({ 
-  title, 
-  onBack, 
-  rightIcon, 
-  onRightPress, 
+export const Header = ({
+  title,
+  onBack,
+  rightIcon,
+  onRightPress,
+  rightIconLabel,
   showBadge = false,
   transparent = false,
   containerStyle,
-  titleStyle
+  titleStyle,
 }: HeaderProps) => {
+  const { t } = useAuth();
 
-  // Dynamically calculate container styles based on the 'transparent' prop
-  const dynamicContainerStyle: ViewStyle = transparent 
-    ? {
-        backgroundColor: 'transparent',
-        borderBottomWidth: 0,
-        elevation: 0, // Remove shadow on Android
-        shadowOpacity: 0, // Remove shadow on iOS
-      } 
-    : {
-        backgroundColor: COLORS.surface || '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-      };
+  const backgroundColor = transparent
+    ? 'transparent'
+    : COLORS.surface;
 
-  // Determine status bar style based on transparency (assumes dark map/background if transparent)
-  const barStyle = transparent ? 'dark-content' : 'dark-content';
+  const borderColor = transparent
+    ? 'transparent'
+    : COLORS.divider;
 
   return (
-    <View style={[styles.container, dynamicContainerStyle, containerStyle]}>
-      
-      {/* --- STATUS BAR CONFIGURATION --- */}
-      <StatusBar 
-        barStyle={barStyle} 
-        backgroundColor={transparent ? 'transparent' : (COLORS.surface || '#FFFFFF')} 
-        translucent={transparent} 
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor,
+          borderBottomColor: borderColor,
+          borderBottomWidth: transparent ? 0 : 1,
+        },
+        transparent && styles.transparentContainer,
+        containerStyle,
+      ]}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={
+          transparent
+            ? 'transparent'
+            : COLORS.surface
+        }
+        translucent={transparent}
       />
-      
-      {/* --- LEFT SECTION (Back Button) --- */}
-      <View style={styles.left}>
+
+      {/* LEFT */}
+      <View style={styles.side}>
         {onBack ? (
-          <TouchableOpacity 
-            onPress={onBack} 
-            style={[styles.btn, transparent && styles.transparentBtn]}
-            activeOpacity={0.6}
-            // hitSlop expands the touchable area without changing the visual size (Crucial for UX)
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          <TouchableOpacity
+            onPress={onBack}
+            style={[
+              styles.actionButton,
+              transparent && styles.transparentButton,
+            ]}
+            activeOpacity={0.75}
+            hitSlop={{
+              top: 10,
+              bottom: 10,
+              left: 10,
+              right: 10,
+            }}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('a11y_go_back')}
           >
-            {/* Typographic Back Arrow (Clean and professional, no emojis) */}
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons
+              name="chevron-back"
+              size={23}
+              color={COLORS.textMain}
+            />
           </TouchableOpacity>
         ) : (
-          // Placeholder to maintain center alignment if there is no back button
-          <View style={{ width: 40 }} /> 
+          <View style={styles.placeholder} />
         )}
-        
-        {/* --- TITLE --- */}
-        <Text 
-          style={[styles.title, titleStyle]} 
+      </View>
+
+      {/* TITLE */}
+      <View style={styles.titleContainer}>
+        <Text
+          style={[
+            styles.title,
+            titleStyle,
+          ]}
           numberOfLines={1}
           accessibilityRole="header"
         >
@@ -112,110 +119,140 @@ export const Header = ({
         </Text>
       </View>
 
-      {/* --- RIGHT SECTION (Action Icon) --- */}
-      <View style={styles.right}>
-        {rightIcon && (
-          <TouchableOpacity 
-            onPress={onRightPress} 
-            style={[styles.btn, transparent && styles.transparentBtn]}
-            activeOpacity={0.6}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+      {/* RIGHT */}
+      <View style={[styles.side, styles.rightSide]}>
+        {rightIcon ? (
+          <TouchableOpacity
+            onPress={onRightPress}
+            style={[
+              styles.actionButton,
+              transparent && styles.transparentButton,
+            ]}
+            activeOpacity={0.75}
+            hitSlop={{
+              top: 10,
+              bottom: 10,
+              left: 10,
+              right: 10,
+            }}
             accessibilityRole="button"
-            accessibilityLabel="Header action"
+            accessibilityLabel={rightIconLabel || t('a11y_header_action')}
           >
-            {/* Handle both String (Typographic Icon) and ReactNode (SVG/Component) */}
             {typeof rightIcon === 'string' ? (
-              <Text style={styles.rightIconText}>{rightIcon}</Text>
+              <Ionicons
+                name={rightIcon as any}
+                size={21}
+                color={COLORS.textMain}
+              />
             ) : (
               rightIcon
             )}
-            
-            {/* Notification Badge */}
-            {showBadge && <View style={styles.badge} />}
+
+            {showBadge && (
+              <View style={styles.badge} />
+            )}
           </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
         )}
       </View>
     </View>
   );
 };
 
-// --- STYLESHEET ---
 const styles = StyleSheet.create({
   container: {
+    minHeight: 72,
+
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    // Add extra padding for iOS notch and Android status bar
-    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 20) + 10,
-    paddingBottom: 15,
-    zIndex: 100, // Ensure header is always clickable and stays on top
+
+    paddingHorizontal: SPACING.lg,
+    paddingTop:
+      Platform.OS === 'ios'
+        ? 10
+        : (StatusBar.currentHeight || 0) + 4,
+    paddingBottom: SPACING.md,
+
+    zIndex: 100,
   },
-  
-  left: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    flex: 1 
-  },
-  
-  right: { 
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    minWidth: 40, // Ensures layout doesn't shift when icon is missing
-  },
-  
-  title: { 
-    fontSize: 18, 
-    fontWeight: '800', 
-    color: COLORS.textMain || '#1A1A1A', 
-    marginLeft: 12,
-    letterSpacing: 0.3,
-    flexShrink: 1, // Prevents long titles from pushing the right icon off-screen
-  },
-  
-  // Standard Button Container
-  btn: { 
-    width: 42, 
-    height: 42, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderRadius: 12, // Modern rounded square
-    backgroundColor: '#F5F5F5', 
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-  },
-  
-  // Special styling for buttons when header is transparent
-  transparentBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+
+  transparentContainer: {
     ...SHADOWS.light,
-    borderColor: '#FFFFFF',
   },
-  
-  backIcon: { 
-    fontSize: 22, 
-    fontWeight: '600',
-    color: COLORS.textMain || '#1A1A1A',
-    marginTop: -2, // Optical alignment
+
+  side: {
+    width: 44,
+    minWidth: 44,
+
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
-  
-  rightIconText: { 
-    fontSize: 16, 
-    fontWeight: '900',
-    color: COLORS.textMain || '#1A1A1A',
+
+  rightSide: {
+    alignItems: 'flex-end',
   },
-  
-  // Premium Notification Badge
+
+  titleContainer: {
+    flex: 1,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    paddingHorizontal: SPACING.sm,
+  },
+
+  title: {
+    fontSize: 18,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    letterSpacing: -0.15,
+    textAlign: 'center',
+  },
+
+  actionButton: {
+    width: 42,
+    height: 42,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: COLORS.surfaceSecondary,
+
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  transparentButton: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+
+    borderColor: COLORS.surface,
+
+    ...SHADOWS.light,
+  },
+
+  placeholder: {
+    width: 42,
+    height: 42,
+  },
+
   badge: {
-    position: 'absolute', 
-    top: 8, 
-    right: 8,
-    width: 12, 
-    height: 12, 
-    borderRadius: 6,
-    backgroundColor: COLORS.danger || '#FF3B30', // Alert red
-    borderWidth: 2, 
-    borderColor: '#FFFFFF', // Creates a "cutout" effect
-    elevation: 3,
-  }
+    position: 'absolute',
+
+    top: 7,
+    right: 7,
+
+    width: 10,
+    height: 10,
+
+    borderRadius: 5,
+
+    backgroundColor: COLORS.danger,
+
+    borderWidth: 2,
+    borderColor: COLORS.surface,
+  },
 });

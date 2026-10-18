@@ -1,620 +1,1330 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, SafeAreaView
+import React, { useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  Modal,
+  SafeAreaView,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
 import { useAuth } from '../../context/AuthContext';
-import { COLORS } from '../../constants/theme'; 
+import { authApi } from '../../api/auth';
+import {
+  COLORS,
+  SIZES,
+  SPACING,
+  SHADOWS,
+  TYPOGRAPHY,
+} from '../../constants/theme';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Header } from '../../components/Header';
+import { isValidEmail, MIN_PASSWORD_LENGTH } from '../../utils/validation';
+import { apiErrorKey } from '../../utils/apiErrors';
 
 const RegisterScreen = ({ navigation }: any) => {
-  // --- HOOKS & GLOBAL CONTEXT ---
-  // Extracting the necessary authentication functions and translation hook from our custom context.
   const { register, login, isLoading, t } = useAuth();
-  
-  // --- CORE STATE MANAGEMENT ---
-  // These states handle the primary credentials and information required for all user types.
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); 
-  
-  // --- DEMOGRAPHIC & CONTACT STATE ---
-  const [dob, setDob] = useState(''); // Date of Birth formatted as DD/MM/YYYY
-  const [phone, setPhone] = useState(''); 
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [dob, setDob] = useState('');
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  
-  // --- LEGAL & UI CONTROL STATE ---
-  const [agreedToTerms, setAgreedToTerms] = useState(false); 
+
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [displayRole, setDisplayRole] = useState<'student' | 'restaurant'>('student');
 
-  // --- EXTENDED DEMOGRAPHIC STATE (NEW FIELDS) ---
-  // These fields collect optional data to build a comprehensive user profile.
-  const [gender, setGender] = useState(''); // Stores the underlying ID ('Male', 'Female', etc.)
-  const [occupation, setOccupation] = useState(''); 
-  const [university, setUniversity] = useState('');
-  const [major, setMajor] = useState('');
-  const [studyYear, setStudyYear] = useState(''); 
+  // Inline field errors (translation keys, translated at render); the same checks as before
+  type FieldErrors = Partial<Record<
+    'name' | 'email' | 'dob' | 'password' | 'confirmPassword' | 'address' | 'terms',
+    string
+  >>;
+  const [errors, setErrors] = useState<FieldErrors>({});
+  // Restaurant sign-up bypasses the context's register(), so it tracks its own busy state
+  const [submittingRestaurant, setSubmittingRestaurant] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
-  // --- DATA MAPPING FOR TRANSLATED ARRAYS ---
-  // We use an array of objects for gender so we can display the translated text to the user
-  // but keep the consistent English ID in the state to send to the backend database.
-  const genderOptions = [
-    { id: 'Male', label: t('gender_male') },
-    { id: 'Female', label: t('gender_female') },
-    { id: 'Prefer not to say', label: t('gender_prefer_not') }
-  ];
-
-  // --- ACTIONS & VALIDATIONS ---
-  
-  /**
-   * Validates the email format using a standard Regular Expression.
-   * Ensures that the user provides a string containing an '@' and a domain.
-   */
-  const validateEmail = (emailStr: string) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(emailStr);
+  const clearError = (field: keyof FieldErrors) => {
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
   };
 
-  /**
-   * Validates the age of the user based on the DD/MM/YYYY string.
-   * The business logic requires users to be at least 18 years old.
-   * Assuming the current operational year is 2026, the user must be born in 2008 or earlier.
-   */
+  const [displayRole, setDisplayRole] = useState<
+    'student' | 'restaurant'
+  >('student');
+
+  const [gender, setGender] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [university, setUniversity] = useState('');
+  const [major, setMajor] = useState('');
+  const [studyYear, setStudyYear] = useState('');
+
+  const genderOptions = [
+    {
+      id: 'Male',
+      label: t('gender_male'),
+    },
+    {
+      id: 'Female',
+      label: t('gender_female'),
+    },
+    {
+      id: 'Prefer not to say',
+      label: t('gender_prefer_not'),
+    },
+  ];
+
   const validateAge = (dobStr: string) => {
     const parts = dobStr.split('/');
+
     if (parts.length !== 3) return false;
-    
+
     const year = parseInt(parts[2], 10);
+
     if (2026 - year < 18) return false;
-    
+
     return true;
   };
 
-  /**
-   * Automatically formats the Date of Birth input field as the user types.
-   * It strips non-numeric characters and injects slashes at the correct positions (DD/MM/YYYY).
-   * It also handles backspace events cleanly without trapping the cursor.
-   */
   const handleDobChange = (text: string) => {
-    // Allow the user to delete characters normally (Backspace handling)
     if (text.length < dob.length) {
       setDob(text);
       return;
     }
 
-    // Remove any non-numeric characters from the raw input string
-    let cleaned = text.replace(/\D/g, '');
+    const cleaned = text.replace(/\D/g, '');
     let formatted = cleaned;
 
-    // Auto-append slashes immediately when the day or month block is completed
     if (cleaned.length >= 5) {
-      // Format as DD/MM/YYYY
-      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
+      formatted = `${cleaned.slice(
+        0,
+        2,
+      )}/${cleaned.slice(
+        2,
+        4,
+      )}/${cleaned.slice(4, 8)}`;
     } else if (cleaned.length === 4) {
-      // Instantly add slash after MM
-      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/`;
+      formatted = `${cleaned.slice(
+        0,
+        2,
+      )}/${cleaned.slice(2, 4)}/`;
     } else if (cleaned.length >= 3) {
-      // Format as DD/MM...
-      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
-    } else if (cleaned.length === 2) {  
-      // Instantly add slash after DD
+      formatted = `${cleaned.slice(
+        0,
+        2,
+      )}/${cleaned.slice(2)}`;
+    } else if (cleaned.length === 2) {
       formatted = `${cleaned}/`;
     }
 
     setDob(formatted);
   };
 
-  /**
-   * The main registration execution function.
-   * It runs through a series of strict validation gates before packaging the state payload
-   * and transmitting it to the backend via the AuthContext register function.
-   */
   const handleRegister = async () => {
-    // 1. Prevent empty core submissions
-    if (!name || !email || !password || !confirmPassword || !dob) {
-      Alert.alert(t('error') || "Error", t('fill_all_fields') || "Please fill in all required fields.");
-      return;
-    }
+    const nextErrors: FieldErrors = {};
 
-    // 2. Strong Email Format Validation
-    if (!validateEmail(email)) {
-      Alert.alert(t('error') || "Error", t('invalid_email') || "Please enter a valid email address.");
-      return;
-    }
+    if (!name) nextErrors.name = 'field_required';
 
-    // 3. Password Match Validation Check
-    if (password !== confirmPassword) {
-      Alert.alert(t('error') || "Error", "Passwords do not match. Please try again.");
-      return;
-    }
+    if (!email) nextErrors.email = 'field_required';
+    else if (!isValidEmail(email)) nextErrors.email = 'invalid_email';
 
-    // 4. Age Restriction Check (Must be 18+)
-    if (!validateAge(dob)) {
-      Alert.alert(t('error') || "Age Restriction", "You must be at least 18 years old to register.");
-      return;
-    }
+    if (!dob) nextErrors.dob = 'field_required';
+    else if (!validateAge(dob)) nextErrors.dob = 'age_restriction_msg';
 
-    // 5. Terms and Conditions (GDPR Compliance Check)
-    if (!agreedToTerms) {
-      Alert.alert(t('error') || "Terms Required", "You must agree to the Terms of Service and Privacy Policy (GDPR) to continue.");
-      return;
-    }
-
-    // 6. Prevent empty address submissions for restaurant accounts
     if (displayRole === 'restaurant' && !address) {
-      Alert.alert(t('error') || "Error", "Restaurant address is required.");
+      nextErrors.address = 'address_required';
+    }
+
+    if (!password) nextErrors.password = 'field_required';
+    else if (password.length < MIN_PASSWORD_LENGTH) nextErrors.password = 'reset_password_too_short';
+
+    if (!confirmPassword) nextErrors.confirmPassword = 'field_required';
+    else if (password && password !== confirmPassword) {
+      nextErrors.confirmPassword = 'reset_password_mismatch';
+    }
+
+    if (!agreedToTerms) nextErrors.terms = 'terms_required_msg';
+
+    setErrors(nextErrors);
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      // Field errors sit above the fold; the terms error is right next to the button
+      const onlyTerms = Object.keys(nextErrors).every((key) => key === 'terms');
+      if (!onlyTerms) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+      return;
+    }
+
+    const backendRole =
+      displayRole === 'student'
+        ? 'student'
+        : 'restaurant';
+
+    const payload = {
+      name,
+      email,
+      password,
+      role: backendRole,
+      phone,
+      date_of_birth: dob,
+      address:
+        displayRole === 'restaurant'
+          ? address
+          : undefined,
+      gender,
+      occupation:
+        displayRole === 'student'
+          ? occupation
+          : undefined,
+      university:
+        displayRole === 'student'
+          ? university
+          : undefined,
+      major:
+        displayRole === 'student'
+          ? major
+          : undefined,
+      study_year:
+        displayRole === 'student'
+          ? studyYear
+          : undefined,
+    };
+
+    if (backendRole === 'restaurant') {
+      // A new restaurant stays pending until an admin approves it, so logging in now would always be
+      // refused (403). Show one message and return to the login screen instead.
+      setSubmittingRestaurant(true);
+      try {
+        await authApi.register(payload);
+        Alert.alert(t('success'), t('msg_reg_success_rest'), [
+          { text: t('ok'), onPress: () => navigation.navigate('Login') },
+        ]);
+      } catch (e: any) {
+        Alert.alert(t('error'), t(apiErrorKey(e, 'generic_error')));
+      } finally {
+        setSubmittingRestaurant(false);
+      }
       return;
     }
 
     try {
-      // Map the UI role selection to the corresponding backend database role schema
-      const backendRole = displayRole === 'student' ? 'user' : 'restaurant';
-      
-      // Sending all collected demographic and credential data to the backend API
-      await register({ 
-        name, 
-        email, 
-        password, 
-        role: backendRole,
-        phone, 
-        date_of_birth: dob, 
-        address: displayRole === 'restaurant' ? address : undefined,
-        gender,
-        occupation: displayRole === 'student' ? occupation : undefined, // Ensures occupation is not sent for restaurants
-        university: displayRole === 'student' ? university : undefined,
-        major: displayRole === 'student' ? major : undefined,
-        study_year: displayRole === 'student' ? studyYear : undefined
-      });
-      
-      // Automatically log the user into the application immediately after successful registration
+      await register(payload);
       await login(email, password);
-
-    } catch (e: any) {
-      // Extract the error message provided by the backend, or fallback to a generic message
-      const msg = e.response?.data?.message || "Registration failed. Please try again.";
-      Alert.alert(t('error') || "Error", msg);
+    } catch {
+      // register()/login() in AuthContext have already shown the error alert
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"} 
+    <KeyboardAvoidingView
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
+      }
       style={styles.container}
     >
-      {/* Top Navigation Header */}
-      <Header title={t('register_title')} onBack={() => navigation.goBack()} />
-      
-      <ScrollView 
+      <Header
+        title={t('register_title')}
+        onBack={() => navigation.goBack()}
+      />
+
+      <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sub}>{t('register_sub')}</Text>
+        {/* INTRO */}
+        <View style={styles.intro}>
+          <View style={styles.introIcon}>
+            <Ionicons
+              name="person-add-outline"
+              size={24}
+              color={COLORS.primary}
+            />
+          </View>
 
-        {/* --- PREMIUM ROLE SELECTOR (Underline Indicator Style) --- */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tabBtn, displayRole === 'student' && styles.tabBtnActive]} 
-            onPress={() => setDisplayRole('student')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, displayRole === 'student' && styles.tabTextActive]}>
-              {t('role_student')}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tabBtn, displayRole === 'restaurant' && styles.tabBtnActive]} 
-            onPress={() => setDisplayRole('restaurant')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, displayRole === 'restaurant' && styles.tabTextActive]}>
-              {t('role_rest')}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>
+            {t('register_title')}
+          </Text>
+
+          <Text style={styles.subtitle}>
+            {t('register_sub')}
+          </Text>
         </View>
 
-        {/* --- REGISTRATION FORM FIELDS --- */}
-        <View style={styles.form}>
-          
-          <Input 
-            label={displayRole === 'student' ? t('name_student_ph') : t('name_rest_ph')}
-            placeholder={displayRole === 'student' ? t('ph_name_student') : t('ph_offer_name')} 
-            value={name} 
-            onChangeText={setName} 
+        {/* ROLE SELECTOR */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            {t('register_as')}
+          </Text>
+
+          <View style={styles.roleContainer}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                setDisplayRole('student')
+              }
+              style={[
+                styles.roleCard,
+                displayRole === 'student' &&
+                  styles.roleCardActive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.roleIcon,
+                  displayRole === 'student' &&
+                    styles.roleIconActive,
+                ]}
+              >
+                <Ionicons
+                  name="school-outline"
+                  size={22}
+                  color={
+                    displayRole === 'student'
+                      ? COLORS.white
+                      : COLORS.primary
+                  }
+                />
+              </View>
+
+              <View style={styles.roleTextContainer}>
+                <Text
+                  style={[
+                    styles.roleTitle,
+                    displayRole === 'student' &&
+                      styles.roleTitleActive,
+                  ]}
+                >
+                  {t('role_student')}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.roleDescription,
+                    displayRole === 'student' &&
+                      styles.roleDescriptionActive,
+                  ]}
+                >
+                  {t('role_student_desc')}
+                </Text>
+              </View>
+
+              {displayRole === 'student' && (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={22}
+                  color={COLORS.primary}
+                />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                setDisplayRole('restaurant')
+              }
+              style={[
+                styles.roleCard,
+                displayRole === 'restaurant' &&
+                  styles.roleCardActive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.roleIcon,
+                  displayRole === 'restaurant' &&
+                    styles.roleIconActive,
+                ]}
+              >
+                <Ionicons
+                  name="restaurant-outline"
+                  size={22}
+                  color={
+                    displayRole === 'restaurant'
+                      ? COLORS.white
+                      : COLORS.primary
+                  }
+                />
+              </View>
+
+              <View style={styles.roleTextContainer}>
+                <Text
+                  style={[
+                    styles.roleTitle,
+                    displayRole === 'restaurant' &&
+                      styles.roleTitleActive,
+                  ]}
+                >
+                  {t('role_rest')}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.roleDescription,
+                    displayRole === 'restaurant' &&
+                      styles.roleDescriptionActive,
+                  ]}
+                >
+                  {t('role_rest_desc')}
+                </Text>
+              </View>
+
+              {displayRole === 'restaurant' && (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={22}
+                  color={COLORS.primary}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* BASIC INFORMATION */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionNumber}>
+              <Text style={styles.sectionNumberText}>
+                1
+              </Text>
+            </View>
+
+            <View>
+              <Text style={styles.sectionTitle}>
+                {t('section_basic_title')}
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                {t('section_basic_sub')}
+              </Text>
+            </View>
+          </View>
+
+          <Input
+            label={
+              displayRole === 'student'
+                ? t('name_student_ph')
+                : t('name_rest_ph')
+            }
+            icon={
+              displayRole === 'student'
+                ? 'person-outline'
+                : 'storefront-outline'
+            }
+            placeholder={
+              displayRole === 'student'
+                ? t('ph_name_student')
+                : t('ph_offer_name')
+            }
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              clearError('name');
+            }}
+            error={errors.name && t(errors.name)}
             autoCapitalize="words"
           />
-          
-          <Input 
-            label={t('email_ph')} 
-            placeholder={t('ph_email')} 
-            value={email} 
-            onChangeText={setEmail} 
-            keyboardType="email-address" 
+
+          <Input
+            label={t('email_ph')}
+            icon="mail-outline"
+            placeholder={t('ph_email')}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              clearError('email');
+            }}
+            error={errors.email && t(errors.email)}
+            keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
 
-          {/* Date of Birth Field utilizing the custom auto-formatting logic and translated dictionary keys */}
-          <Input 
-            label={t('dob')} 
-            placeholder={t('dob_ph')} 
-            value={dob} 
-            onChangeText={handleDobChange} 
-            keyboardType="numeric" 
+          <Input
+            label={t('dob')}
+            icon="calendar-outline"
+            placeholder={t('dob_ph')}
+            value={dob}
+            onChangeText={(text) => {
+              handleDobChange(text);
+              clearError('dob');
+            }}
+            error={errors.dob && t(errors.dob)}
+            keyboardType="numeric"
             maxLength={10}
           />
 
-          {/* --- GENDER SELECTION (CHIP COMPONENT STYLE) --- */}
-          {/* Translates the label and iterates over the mapped genderOptions array for localization */}
-          <Text style={styles.inputLabel}>{t('gender_optional')}</Text>
+          {/* GENDER */}
+          <Text style={styles.fieldLabel}>
+            {t('gender_optional')}
+          </Text>
+
           <View style={styles.chipRow}>
-            {genderOptions.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={[styles.chip, gender === item.id && styles.chipActive]}
-                onPress={() => setGender(item.id)}
-              >
-                <Text style={[styles.chipText, gender === item.id && styles.chipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {genderOptions.map((item) => {
+              const active = gender === item.id;
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setGender(item.id)
+                  }
+                  style={[
+                    styles.chip,
+                    active && styles.chipActive,
+                  ]}
+                >
+                  {active && (
+                    <Ionicons
+                      name="checkmark"
+                      size={14}
+                      color={COLORS.white}
+                    />
+                  )}
+
+                  <Text
+                    style={[
+                      styles.chipText,
+                      active &&
+                        styles.chipTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* Optional Phone Field (Available to both roles) */}
-          <Input 
-            label={t('phone_optional')} 
-            placeholder="+36 30 123 4567" 
-            value={phone} 
-            onChangeText={setPhone} 
-            keyboardType="phone-pad" 
+          <Input
+            label={t('phone_optional')}
+            icon="call-outline"
+            placeholder="+36 30 123 4567"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
           />
+        </View>
 
-          {/* --- STUDENT SPECIFIC CONDITIONAL FIELDS --- */}
-          {displayRole === 'student' && (
-            <>
-              {/* Occupation moved here, restricted to Student role only */}
-              <Input 
-                label={t('occupation_optional')} 
-                placeholder="e.g. Graphic Designer, Freelancer" 
-                value={occupation} 
-                onChangeText={setOccupation} 
-                autoCapitalize="words"
-              />
-
-              <Input 
-                label={t('uni_optional')} 
-                placeholder="e.g. BME, ELTE, Corvinus" 
-                value={university} 
-                onChangeText={setUniversity} 
-                autoCapitalize="words"
-              />
-              
-              <Input 
-                label={t('major_optional')} 
-                placeholder="e.g. Computer Science" 
-                value={major} 
-                onChangeText={setMajor} 
-                autoCapitalize="words"
-              />
-
-              <Text style={styles.inputLabel}>{t('study_year_optional')}</Text>
-              <View style={styles.chipRow}>
-                {['1st', '2nd', '3rd', '4th', '5+'].map((item) => (
-                  <TouchableOpacity 
-                    key={item} 
-                    style={[styles.chip, studyYear === item && styles.chipActive]}
-                    onPress={() => setStudyYear(item)}
-                  >
-                    <Text style={[styles.chipText, studyYear === item && styles.chipTextActive]}>{item}</Text>
-                  </TouchableOpacity>
-                ))}
+        {/* STUDENT INFORMATION */}
+        {displayRole === 'student' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionNumber}>
+                <Text style={styles.sectionNumberText}>
+                  2
+                </Text>
               </View>
-            </>
-          )}
 
-          {/* Address field is conditionally rendered exclusively for Restaurant accounts */}
-          {displayRole === 'restaurant' && (
-             <Input 
-               label={t('address_ph') || "Restaurant Address"} 
-               placeholder="1051 Budapest, Szent István tér" 
-               value={address} 
-               onChangeText={setAddress} 
-               autoCapitalize="words"
-             />
-          )}
-          
-          {/* Security & Credential Inputs using strict translated labels */}
-          <Input 
-            label={t('secure_pass')} 
-            placeholder={t('ph_password')} 
-            value={password} 
-            onChangeText={setPassword} 
-            isPassword 
+              <View>
+                <Text style={styles.sectionTitle}>
+                  {t('section_student_title')}
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  {t('section_student_sub')}
+                </Text>
+              </View>
+            </View>
+
+            <Input
+              label={t('occupation_optional')}
+              icon="briefcase-outline"
+              placeholder={t('ph_occupation')}
+              value={occupation}
+              onChangeText={setOccupation}
+              autoCapitalize="words"
+            />
+
+            <Input
+              label={t('uni_optional')}
+              icon="school-outline"
+              placeholder={t('ph_university')}
+              value={university}
+              onChangeText={setUniversity}
+              autoCapitalize="words"
+            />
+
+            <Input
+              label={t('major_optional')}
+              icon="book-outline"
+              placeholder={t('ph_major')}
+              value={major}
+              onChangeText={setMajor}
+              autoCapitalize="words"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('study_year_optional')}
+            </Text>
+
+            <View style={styles.chipRow}>
+              {[
+                '1st',
+                '2nd',
+                '3rd',
+                '4th',
+                '5+',
+              ].map((item) => {
+                const active =
+                  studyYear === item;
+
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    activeOpacity={0.8}
+                    onPress={() =>
+                      setStudyYear(item)
+                    }
+                    style={[
+                      styles.chip,
+                      active &&
+                        styles.chipActive,
+                    ]}
+                  >
+                    {active && (
+                      <Ionicons
+                        name="checkmark"
+                        size={14}
+                        color={COLORS.white}
+                      />
+                    )}
+
+                    <Text
+                      style={[
+                        styles.chipText,
+                        active &&
+                          styles.chipTextActive,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* RESTAURANT INFORMATION */}
+        {displayRole === 'restaurant' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionNumber}>
+                <Text style={styles.sectionNumberText}>
+                  2
+                </Text>
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>
+                  {t('section_rest_title')}
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  {t('section_rest_sub')}
+                </Text>
+              </View>
+            </View>
+
+            <Input
+              label={
+                t('address_ph') ||
+                'Restaurant Address'
+              }
+              icon="location-outline"
+              placeholder="1051 Budapest, Szent István tér"
+              value={address}
+              onChangeText={(text) => {
+                setAddress(text);
+                clearError('address');
+              }}
+              error={errors.address && t(errors.address)}
+              autoCapitalize="words"
+            />
+          </View>
+        )}
+
+        {/* SECURITY */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionNumber}>
+              <Text style={styles.sectionNumberText}>
+                {displayRole === 'student'
+                  ? '3'
+                  : '3'}
+              </Text>
+            </View>
+
+            <View>
+              <Text style={styles.sectionTitle}>
+                {t('security')}
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                {t('section_security_sub')}
+              </Text>
+            </View>
+          </View>
+
+          <Input
+            label={t('secure_pass')}
+            icon="lock-closed-outline"
+            placeholder={t('ph_password')}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              clearError('password');
+            }}
+            error={errors.password && t(errors.password)}
+            isPassword
           />
 
-          <Input 
-            label={t('confirm_pass')} 
-            placeholder={t('confirm_pass_ph')} 
-            value={confirmPassword} 
-            onChangeText={setConfirmPassword} 
-            isPassword 
+          <Input
+            label={t('confirm_pass')}
+            icon="shield-checkmark-outline"
+            placeholder={t('confirm_pass_ph')}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              clearError('confirmPassword');
+            }}
+            error={errors.confirmPassword && t(errors.confirmPassword)}
+            isPassword
           />
+        </View>
 
-          {/* --- TERMS & CONDITIONS (GDPR) CHECKBOX AREA --- */}
-          <View style={styles.checkboxContainer}>
-            <TouchableOpacity 
-              style={[styles.checkbox, agreedToTerms && styles.checkboxActive]} 
-              onPress={() => setAgreedToTerms(!agreedToTerms)}
-              activeOpacity={0.8}
+        {/* TERMS */}
+        <View style={styles.termsCard}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              setAgreedToTerms(!agreedToTerms);
+              clearError('terms');
+            }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreedToTerms }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[
+              styles.checkbox,
+              agreedToTerms &&
+                styles.checkboxActive,
+            ]}
+          >
+            {agreedToTerms && (
+              <Ionicons
+                name="checkmark"
+                size={16}
+                color={COLORS.white}
+              />
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.termsText}>
+            {/* Prefix/middle/suffix are separate keys because word order differs between EN/HU/TR */}
+            {t('terms_agree_prefix')}
+            <Text
+              style={styles.termsLink}
+              onPress={() =>
+                setShowTermsModal(true)
+              }
             >
-              {agreedToTerms && <Text style={styles.checkIcon}>✓</Text>}
-            </TouchableOpacity>
-            <Text style={styles.termsText}>
-              I agree to the{' '} 
-              <Text style={styles.termsLink} onPress={() => setShowTermsModal(true)}>
-                Terms of Service
-              </Text>{' '}
-              and{' '}
-              <Text style={styles.termsLink} onPress={() => setShowTermsModal(true)}>
-                Privacy Policy (GDPR)
-              </Text>.
+              {t('terms_of_service')}
+            </Text>
+            {t('terms_agree_middle')}
+            <Text
+              style={styles.termsLink}
+              onPress={() =>
+                setShowTermsModal(true)
+              }
+            >
+              {t('privacy_policy')}
+            </Text>
+            {t('terms_agree_suffix')}
+          </Text>
+        </View>
+
+        {errors.terms && (
+          <View style={styles.termsError}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={14}
+              color={COLORS.danger}
+            />
+            <Text style={styles.termsErrorText}>
+              {t(errors.terms)}
             </Text>
           </View>
+        )}
 
-          <View style={styles.buttonSpacing} />
-          
-          <Button 
-            title={t('register_btn')} 
-            onPress={handleRegister} 
-            loading={isLoading} 
-            variant="primary" 
-          />
+        {/* REGISTER */}
+        <Button
+          title={t('register_btn')}
+          onPress={handleRegister}
+          loading={isLoading || submittingRestaurant}
+          variant="primary"
+          icon={
+            <Ionicons
+              name="arrow-forward-outline"
+              size={19}
+              color={COLORS.white}
+            />
+          }
+        />
+
+        {/* LOGIN LINK */}
+        <View style={styles.loginFooter}>
+          <Text style={styles.loginText}>
+            {t('has_acc')}{' '}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() =>
+              navigation.goBack()
+            }
+          >
+            <Text style={styles.loginLink}>
+              {t('sign_in')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* --- PRIVACY POLICY & LEGAL TERMS MODAL COMPONENT --- */}
-      {/* This modal presents the strict GDPR compliant text required for legal operation in the EU. */}
+      {/* LEGAL MODAL */}
       <Modal
         visible={showTermsModal}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowTermsModal(false)}
+        onRequestClose={() =>
+          setShowTermsModal(false)
+        }
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView
+          style={styles.modalContainer}
+        >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Legal & Privacy</Text>
-            <TouchableOpacity onPress={() => setShowTermsModal(false)} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <View>
+              <Text style={styles.modalEyebrow}>
+                FOODSHARE
+              </Text>
+
+              <Text style={styles.modalTitle}>
+                {t('legal_title')}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() =>
+                setShowTermsModal(false)
+              }
+              style={styles.closeButton}
+              activeOpacity={0.75}
+            >
+              <Ionicons
+                name="close"
+                size={22}
+                color={COLORS.textMain}
+              />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody}>
-            <Text style={styles.modalHeading}>1. Terms of Service</Text>
-            <Text style={styles.modalText}>
-              Welcome to FoodShare. By registering for an account, you agree to use our platform responsibly. 
-              FoodShare aims to reduce food waste by connecting students and locals with restaurants offering 
-              surplus food. You agree not to misuse the claim system or distribute fake QR codes.
+
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.modalHeading}>
+              1. {t('terms_of_service')}
             </Text>
 
-            <Text style={styles.modalHeading}>2. Privacy Policy (GDPR Compliance)</Text>
             <Text style={styles.modalText}>
-              Your privacy is critically important to us. Under the General Data Protection Regulation (GDPR):
-              {"\n\n"}• We collect your data (Name, Email, Demographic details) solely to provide and improve the FoodShare service.
-              {"\n"}• Your location data is only used locally on your device to show nearby offers and is not stored permanently.
-              {"\n"}• We do not sell your personal data to third parties.
-              {"\n"}• You have the right to request deletion of your account and all associated data at any time via your Profile settings.
+              {t('legal_tos_body')}
             </Text>
 
-            <Text style={styles.modalHeading}>3. Verification & Documents</Text>
+            <Text style={styles.modalHeading}>
+              2. {t('privacy_policy')}
+            </Text>
+
             <Text style={styles.modalText}>
-              If you upload a Student ID or other verification documents, they are stored securely on our AWS S3 servers 
-              and are only reviewed by our admin team to grant you "Verified" status. They are not shared publicly.
+              {t('legal_privacy_body')}
+            </Text>
+
+            <Text style={styles.modalHeading}>
+              3. {t('legal_docs_heading')}
+            </Text>
+
+            <Text style={styles.modalText}>
+              {t('legal_docs_body')}
             </Text>
           </ScrollView>
+
           <View style={styles.modalFooter}>
-            <Button 
-              title="I Understand & Accept" 
+            <Button
+              title={t('legal_accept_btn')}
               onPress={() => {
                 setAgreedToTerms(true);
+                clearError('terms');
                 setShowTermsModal(false);
-              }} 
+              }}
+              variant="primary"
             />
           </View>
         </SafeAreaView>
       </Modal>
-
     </KeyboardAvoidingView>
   );
 };
 
-// --- STYLESHEET ---
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
-  },
-  content: { 
-    padding: 24,
-    paddingTop: 10,
-    paddingBottom: 40 
-  },
-  sub: { 
-    fontSize: 15, 
-    color: COLORS.textSub, 
-    marginBottom: 30, 
-    textAlign: 'center',
-    fontWeight: '400',
-    lineHeight: 22
-  },
-  
-  // Premium Tab Styles (Underline instead of blocky toggle)
-  tabContainer: { 
-    flexDirection: 'row', 
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: 30 
-  },
-  tabBtn: { 
-    flex: 1, 
-    paddingVertical: 14, 
-    alignItems: 'center', 
-  },
-  tabBtnActive: { 
-    borderBottomWidth: 3,
-    borderBottomColor: COLORS.primary, // Brand highlight color
-  },
-  tabText: { 
-    fontWeight: '600', 
-    color: COLORS.placeholder,
-    fontSize: 14,
-    letterSpacing: 0.5
-  },
-  tabTextActive: { 
-    color: COLORS.primary, 
-    fontWeight: '800' 
-  },
-  
-  form: { 
-    width: '100%' 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
 
-  // Input Label & Dynamic Chip Component Styles
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textMain,
-    marginBottom: 8,
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
+  content: {
+    paddingHorizontal: SPACING.xxl,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xxxl,
   },
+
+  /* ---------------- INTRO ---------------- */
+
+  intro: {
+    alignItems: 'center',
+    marginBottom: SPACING.xxl,
+  },
+
+  introIcon: {
+    width: 54,
+    height: 54,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    backgroundColor: COLORS.primaryLight,
+
+    borderRadius: SIZES.radiusMd,
+
+    marginBottom: SPACING.md,
+  },
+
+  title: {
+    ...TYPOGRAPHY.title,
+
+    color: COLORS.textMain,
+    textAlign: 'center',
+  },
+
+  subtitle: {
+    marginTop: SPACING.sm,
+
+    fontSize: 14,
+    lineHeight: 21,
+
+    color: COLORS.textSub,
+
+    textAlign: 'center',
+
+    maxWidth: 320,
+  },
+
+  /* ---------------- SECTIONS ---------------- */
+
+  section: {
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusXl,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    padding: SPACING.xxl,
+
+    marginBottom: SPACING.lg,
+
+    ...SHADOWS.light,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    marginBottom: SPACING.xxl,
+  },
+
+  sectionNumber: {
+    width: 34,
+    height: 34,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: SIZES.radiusFull,
+
+    backgroundColor: COLORS.primaryLight,
+
+    marginRight: SPACING.md,
+  },
+
+  sectionNumberText: {
+    fontSize: 13,
+    fontWeight: '800',
+
+    color: COLORS.primary,
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+  },
+
+  sectionSubtitle: {
+    marginTop: 2,
+
+    fontSize: 12,
+
+    color: COLORS.textMuted,
+  },
+
+  /* ---------------- ROLE ---------------- */
+
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+
+    color: COLORS.textMain,
+
+    marginBottom: SPACING.sm,
+    marginLeft: SPACING.xs,
+  },
+
+  roleContainer: {
+    gap: SPACING.sm,
+  },
+
+  roleCard: {
+    minHeight: 76,
+
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    padding: SPACING.md,
+
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusMd,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  roleCardActive: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: COLORS.primary,
+  },
+
+  roleIcon: {
+    width: 44,
+    height: 44,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: SIZES.radius,
+
+    backgroundColor: COLORS.primaryLight,
+
+    marginRight: SPACING.md,
+  },
+
+  roleIconActive: {
+    backgroundColor: COLORS.primary,
+  },
+
+  roleTextContainer: {
+    flex: 1,
+  },
+
+  roleTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+  },
+
+  roleTitleActive: {
+    color: COLORS.primary,
+  },
+
+  roleDescription: {
+    marginTop: 3,
+
+    fontSize: 12,
+
+    color: COLORS.textMuted,
+  },
+
+  roleDescriptionActive: {
+    color: COLORS.textSub,
+  },
+
+  /* ---------------- FIELDS ---------------- */
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+
+    color: COLORS.textMain,
+
+    marginBottom: SPACING.sm,
+    marginLeft: SPACING.xs,
+  },
+
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 20,
-    gap: 8,
+
+    gap: SPACING.sm,
+
+    marginBottom: SPACING.lg,
   },
+
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+
+    borderRadius: SIZES.radiusFull,
+
     borderWidth: 1,
     borderColor: COLORS.border,
+
     backgroundColor: COLORS.surface,
   },
+
   chipActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
+
   chipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
+
     color: COLORS.textSub,
   },
+
   chipTextActive: {
     color: COLORS.white,
+
+    marginLeft: 4,
   },
 
-  // Legal Checkbox Form Styles
-  checkboxContainer: {
+  /* ---------------- TERMS ---------------- */
+
+  termsCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start', // Aligned to the top to accommodate potential text wrapping
-    marginTop: 10,
-    marginBottom: 20,
-    paddingRight: 20, 
+    alignItems: 'flex-start',
+
+    padding: SPACING.lg,
+
+    marginBottom: SPACING.lg,
+
+    backgroundColor: COLORS.surface,
+
+    borderRadius: SIZES.radiusMd,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    ...SHADOWS.light,
   },
+
   checkbox: {
     width: 22,
     height: 22,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderRadius: 6,
-    marginRight: 12,
-    justifyContent: 'center',
+
     alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: 6,
+
+    borderWidth: 1.5,
+    borderColor: COLORS.borderStrong,
+
     backgroundColor: COLORS.surface,
-    marginTop: 2 // Slight vertical shift to perfectly align with the text baseline
+
+    marginRight: SPACING.md,
+    marginTop: 1,
   },
+
   checkboxActive: {
-    borderColor: COLORS.primary,
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
-  checkIcon: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
+
   termsText: {
-    fontSize: 13,
-    color: COLORS.textSub,
-    lineHeight: 20,
     flex: 1,
+
+    fontSize: 13,
+    lineHeight: 20,
+
+    color: COLORS.textSub,
   },
+
   termsLink: {
     color: COLORS.primary,
+
     fontWeight: '700',
     textDecorationLine: 'underline',
   },
 
-  buttonSpacing: {
-    height: 10
+  termsError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.lg,
+    marginLeft: SPACING.xs,
   },
 
-  // Legal Modal Overlay Styles
+  termsErrorText: {
+    marginLeft: SPACING.xs,
+
+    fontSize: 12,
+    fontWeight: '500',
+
+    color: COLORS.danger,
+  },
+
+  /* ---------------- FOOTER ---------------- */
+
+  loginFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    marginTop: SPACING.lg,
+  },
+
+  loginText: {
+    fontSize: 14,
+
+    color: COLORS.textSub,
+  },
+
+  loginLink: {
+    fontSize: 14,
+    fontWeight: '800',
+
+    color: COLORS.primary,
+  },
+
+  /* ---------------- MODAL ---------------- */
+
   modalContainer: {
     flex: 1,
+
     backgroundColor: COLORS.background,
   },
+
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'space-between',
+
+    paddingHorizontal: SPACING.xxl,
+    paddingVertical: SPACING.lg,
+
+    backgroundColor: COLORS.surface,
+
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.surface
   },
-  modalTitle: {
-    fontSize: 18,
+
+  modalEyebrow: {
+    fontSize: 10,
     fontWeight: '800',
-    color: COLORS.textMain
+
+    color: COLORS.primary,
+
+    letterSpacing: 1,
   },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
+
+  modalTitle: {
+    marginTop: 2,
+
+    fontSize: 20,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
   },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textSub
+
+  closeButton: {
+    width: 42,
+    height: 42,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: SIZES.radius,
+
+    backgroundColor: COLORS.surfaceSecondary,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
+
   modalBody: {
     flex: 1,
-    padding: 24,
+
+    paddingHorizontal: SPACING.xxl,
   },
+
   modalHeading: {
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: 10,
-    marginTop: 20,
+    fontWeight: '800',
+
+    color: COLORS.textMain,
+
+    marginTop: SPACING.xxl,
+    marginBottom: SPACING.sm,
   },
+
   modalText: {
     fontSize: 14,
+    lineHeight: 23,
+
     color: COLORS.textSub,
-    lineHeight: 24,
   },
+
   modalFooter: {
-    padding: 24,
+    padding: SPACING.xxl,
+
+    backgroundColor: COLORS.surface,
+
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-  }
+  },
 });
 
 export default RegisterScreen;

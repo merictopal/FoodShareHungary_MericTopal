@@ -31,7 +31,7 @@ export const OfferCard = ({ item, t, onClaim }: any) => (
 
     <View style={[styles.row, {marginTop: 15}]}>
       <Text style={{color: COLORS.primary, fontWeight: '700'}}>
-        🔥 {item.quantity} {t('items_left') || 'adet'}
+        🔥 {item.quantity} {t('left') || 'adet'}
       </Text>
       <TouchableOpacity style={styles.claimBtn} onPress={() => onClaim(item.id)}>
         <Text style={{color: '#FFF', fontWeight: 'bold', fontSize: 12}}>

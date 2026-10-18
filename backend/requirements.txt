@@ -1,6 +1,14 @@
 Flask==3.0.0
 Flask-SQLAlchemy==3.1.1
+# SQLAlchemy 2.1 maps postgresql:// to psycopg (v3), which is not installed; 2.0.x uses psycopg2 below.
+SQLAlchemy==2.0.43
 Flask-Cors==4.0.0
+Flask-Limiter==4.1.1
+PyJWT==2.11.0
+GeoAlchemy2==0.18.3
+boto3==1.40.45
+firebase-admin==7.2.0
+google-auth==2.49.0
 psycopg2-binary==2.9.10
 gunicorn==21.2.0
 Werkzeug==3.0.1

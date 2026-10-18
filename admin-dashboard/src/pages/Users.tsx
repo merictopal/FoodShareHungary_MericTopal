@@ -5,7 +5,7 @@ import {
   LogOut, FileText, Search, MoreVertical, Activity, Ban, X,
   ChevronUp, ChevronDown, ChevronsUpDown
 } from 'lucide-react';
-import { client } from '../api/client';
+import { client, clearAdminSession } from '../api/client';
 
 // Interface for table row data
 interface SystemUser {
@@ -71,7 +71,10 @@ export default function Users() {
     fetchUsers();
   }, []);
 
-  const handleLogout = () => navigate('/');
+  const handleLogout = () => {
+    clearAdminSession();
+    navigate('/', { replace: true });
+  };
 
   const toggleDropdown = (userId: number) => {
     setOpenDropdownId(openDropdownId === userId ? null : userId);
@@ -270,7 +273,7 @@ export default function Users() {
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase
                             ${user.role === 'restaurant' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {user.role === 'student' ? 'user' : user.role}
+                            {user.role === 'user' ? 'student' : user.role}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -351,7 +354,7 @@ export default function Users() {
                   <div className="text-center">
                     <div className="text-2xl font-black text-gray-800 tracking-tight">{selectedUserStats.name}</div>
                     <div className="text-sm font-bold text-emerald-600 uppercase tracking-widest mt-1">
-                      {selectedUserStats.role === 'student' ? 'user' : selectedUserStats.role} • Lvl {selectedUserStats.level}
+                      {selectedUserStats.role === 'user' ? 'student' : selectedUserStats.role} • Lvl {selectedUserStats.level}
                     </div>
                   </div>
 

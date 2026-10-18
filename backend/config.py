@@ -18,6 +18,10 @@ class Config:
     JWT_EXPIRATION_HOURS = 24
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Hard cap for any request body (largest legitimate upload: a 10 MB verification document
+    # plus multipart overhead). Larger requests are refused with 413 before a route runs.
+    MAX_CONTENT_LENGTH = 11 * 1024 * 1024
     
     @staticmethod
     def init_app(app):

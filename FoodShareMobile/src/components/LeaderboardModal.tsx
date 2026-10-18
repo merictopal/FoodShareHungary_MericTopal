@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { COLORS, SHADOWS } from '../constants/theme';
 import { client } from '../api/client'; // Adjust path if your client is elsewhere
 import { useAuth } from '../context/AuthContext';
@@ -32,16 +33,21 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ visible, onC
   // State Management
   const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed request (429, offline, 5xx) must not look like an empty leaderboard
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Fetch Leaderboard Data from Backend
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
+      setLoadFailed(false);
       // Matches your Python backend route: @app.route('/api/leaderboard')
       const response = await client.get('/leaderboard');
-      setLeaders(response.data);
-    } catch (error) {
-      console.error("Leaderboard fetch error:", error);
+      setLeaders(Array.isArray(response.data) ? response.data : []);
+    } catch (error: any) {
+      // warn (not error): no full-screen dev overlay; status/message only
+      console.warn('Leaderboard fetch failed:', error?.response?.status ?? error?.message);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -91,7 +97,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ visible, onC
               
               {/* Header */}
               <View style={styles.header}>
-                <Text style={styles.title}>🏆 {t('leaderboard') || 'Leaderboard'}</Text>
+                <View style={styles.titleRow}>
+                  <Ionicons name="trophy" size={22} color={COLORS.gold} />
+                  <Text style={styles.title}>{t('leaderboard')}</Text>
+                </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.closeBtnText}>✕</Text>
                 </TouchableOpacity>
@@ -104,7 +113,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ visible, onC
                 </View>
               ) : leaders.length === 0 ? (
                 <View style={styles.loadingContainer}>
-                  <Text style={styles.emptyText}>{t('no_data') || 'No data available yet.'}</Text>
+                  <Text style={styles.emptyText}>{loadFailed ? t('generic_error') : (t('no_data') || 'No data available yet.')}</Text>
                 </View>
               ) : (
                 <FlatList
@@ -144,6 +153,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     fontSize: 22,
