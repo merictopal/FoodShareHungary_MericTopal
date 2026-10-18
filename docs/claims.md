@@ -47,7 +47,7 @@ Restaurants publish offers (`free` or `discount`). Verified students reserve one
 
 ## Rules
 - The claimant is always `g.user.id`; a client-supplied `user_id` is ignored.
-- Never replace the conditional UPDATE or the unique constraint with read-then-write Python (CLAUDE.md, concurrency).
+- Never replace the conditional UPDATE or the unique constraint with read-then-write Python (project rule for concurrency-sensitive writes).
 - A restaurant can only list or cancel its own offers (the query filters on its own `restaurant_id`).
 
 ## Known limitations

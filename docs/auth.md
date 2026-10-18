@@ -1,6 +1,6 @@
 # Auth (JWT, roles, sessions)
 
-Short reference for Claude sessions. Canonical status: `PROJECT_STATE.md`. Checked against the code on 2026-09-30.
+Short technical reference. Canonical status: `PROJECT_STATE.md`. Checked against the code on 2026-09-30.
 
 ## Purpose
 Registration (email or Google), login, dual-token JWT sessions, and role/ownership checks for every protected route.
@@ -66,7 +66,7 @@ Registration (email or Google), login, dual-token JWT sessions, and role/ownersh
   the result is a generic 500 "System error." instead of a 409. A password change doesn't require the old password.
 - Forgot password e-mails a 6-digit code that is never stored, and there is no reset endpoint. Information disclosure: an unknown email returns
   200 (anti-enumeration), but a registered email returns 500 when SMTP fails or isn't configured. The response therefore reveals whether an account exists.
-- Error shape: `role_required` returns `{error, message}` with no `"success": false`, unlike the CLAUDE.md contract (only the new
+- Error shape: `role_required` returns `{error, message}` with no `"success": false`, unlike the project's API error contract `{"success": false, "error", "message"}` (only the new
   `Account Suspended` response includes it). `config.SECRET_KEY`
   has a hard-coded fallback (not used for JWT). `JWT_EXPIRATION_HOURS=24` is unused (the real lifetimes are hard-coded in `auth_service.py`).
 - Auth service/routes don't leak `str(e)` (errors are only printed). For the leak locations in other areas, see `thesis.md` → limitations.

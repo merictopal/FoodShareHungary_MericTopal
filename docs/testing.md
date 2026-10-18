@@ -18,10 +18,9 @@ How behaviour is verified, and where the thesis evidence lives. Status vocabular
   - **Every run writes to the DB**: it registers a new `testbot_<random>@student.hu` student (+ audit rows). That's how test user 85 came about.
   - This is what PROJECT_STATE §4 calls "backend pytest `test_api.py` 2 passed". In the thesis, describe it as 2 automated
     API tests against a running server, not as an in-process unit/pytest suite.
-- `backend/tests/CLAUDE.md` is referenced by `conftest.py` and `.claude/rules/test-after-every-feature.md` but **does not exist**. The
-  rules it would hold are in the `conftest.py` docstring (in-process, read-only, locally minted tokens).
+- The rules for the test suites are in the `conftest.py` docstring (in-process, read-only, locally minted tokens).
 - Gate: `python scripts/run_checks.py` runs backend `pytest -m "smoke or edge"` plus the TS ratchet (`tsc`; baseline in
-  `.claude/hooks/tsc-baseline.json`: admin 1, mobile 17). The push hook runs it (`.claude/rules/push-gate.md`).
+  `scripts/tsc-baseline.json`; admin 1, mobile 17 at that time). A local pre-push hook can run it.
 - Jest: 1 suite fails (Firebase ESM, pre-existing). Mobile release JS bundle builds.
 
 - Gate result 2026-09-30, after fixes 19–20: backend 78 passed / 5 xfailed; TypeScript errors at baseline (admin 1, mobile 17).
@@ -30,14 +29,14 @@ How behaviour is verified, and where the thesis evidence lives. Status vocabular
   - edge: `user_id` spoofing ignored, refresh token → 401, `is_account_suspended` truth table
 
 ## Focused live test (2026-09-30): inbox + suspension
-- `thesis_evidence/2026-09-30/scripts/t_inbox_suspension.py setup | suspend | cleanup` runs against `python backend/run.py`
-  (`.claude/launch.json` → `backend`). Auth calls are throttled to ≤5/min.
+- `thesis_evidence/2026-09-30/scripts/t_inbox_suspension.py setup | suspend | cleanup` runs against `python backend/run.py`.
+  Auth calls are throttled to ≤5/min.
 - It **writes TEST data** (`*@fs-test.local`, `[TEST]` offers). Admin actions use a token minted for admin 27.
   Passwords and tokens stay in a scratch state file, never in the evidence.
 - `cleanup` deletes **only the ids recorded by the run** (including `[TEST]` notifications sent to real user 31), then asserts the protected
   records and the table totals. It isn't the global cleanup tool.
 - Result: 60/60 PASS (`inbox_suspension_results.jsonl`). Emulator screenshots `n01`, `n02`, `s01` in `thesis_evidence/2026-09-30/screenshots/`.
-- Emulator tips: Metro is `.claude/launch.json` → `metro` (cwd `FoodShareMobile`) plus `adb reverse tcp:8081 tcp:8081`. The emulator keyboard autocorrects
+- Emulator tips: Metro is `npx react-native start` (cwd `FoodShareMobile`) plus `adb reverse tcp:8081 tcp:8081`. The emulator keyboard autocorrects
   `adb input text`, so type credentials one character at a time and hide the keyboard before tapping the next field.
 
 ## Manual / API evidence (2026-09-29)

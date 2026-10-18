@@ -20,7 +20,7 @@ Store restaurant coordinates, keep a PostGIS point in sync with them, and sort o
 - `/api/offers`: active offers (`claimable_offer_conditions()`), ordered by spherical distance when the request carries `lat`+`lng`; without them (position unknown) `distance` is `null` and the order is newest first. There is no server-side default position (the former Istanbul default was removed 2026-10-08, audit F10).
 
 ## Rules
-- Never write `geom` directly (CLAUDE.md). A PUT with invalid coordinates → 400.
+- Never write `geom` directly; it is derived from `lat`/`lng` by a model event. A PUT with invalid coordinates → 400.
 
 ## Google Maps key (mobile map tiles, Fix 6 – 2026-10-07)
 - The Home map needs a Maps SDK for Android key. It is never committed: put `MAPS_API_KEY=<key>` in the git-ignored

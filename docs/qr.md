@@ -26,7 +26,7 @@ A restaurant scans a student's claim QR code. The claim becomes `validated`, the
 ## Rules
 - Double-verification protection is on the **server**: the conditional UPDATE. The scanner lock is only a client-side convenience.
 - Ownership check before any state change: a restaurant can verify only its own offers' claims.
-- Keep `ON CONFLICT` and the SQL increments (CLAUDE.md, concurrency-sensitive writes).
+- Keep `ON CONFLICT` and the SQL increments (concurrency-sensitive writes).
 
 ## Known limitations
 - `level` is assigned in Python after the locked increment. That's safe per claim, but it isn't a single SQL expression.

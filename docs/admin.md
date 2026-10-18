@@ -20,7 +20,7 @@ A web panel where an admin verifies accounts, suspends users, cancels offers and
 
 ## Rules
 - The backend enforces the admin role on every route. The page-level role check and `RequireAdmin` are UX only.
-- The admin dashboard is English-only (CLAUDE.md).
+- The admin dashboard is English-only (project convention).
 
 ## Known limitations
 - Approve, reject, suspend and offer-cancel **write no `audit_logs` row**. The audit log only holds auth events (see `auth.md`).

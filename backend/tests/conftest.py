@@ -1,7 +1,7 @@
 """
 Shared fixtures for the smoke + edge suites.
 
-Rules for everything under tests/ (see tests/CLAUDE.md):
+Rules for everything under tests/:
 - In-process only (Flask test client). No live server, no network.
 - READ-ONLY against the dev database. Tests may SELECT existing rows but must never
   INSERT/UPDATE/DELETE. Anything that needs writes belongs in a separate, opt-in suite

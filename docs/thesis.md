@@ -1,4 +1,4 @@
-# Thesis fact sheet (for Claude sessions)
+# Thesis fact sheet
 
 This isn't a chapter. Use it to check every claim in the thesis. Details are in the domain docs; status is in `PROJECT_STATE.md`.
 Code facts are as of 2026-09-30. Status words: IMPLEMENTED / TESTED / DATABASE VERIFIED / AWS VERIFIED / OBSERVED / NOT TESTED.

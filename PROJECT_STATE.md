@@ -110,7 +110,7 @@ against a local backend, 60/60 PASS (`inbox_suspension_results.jsonl`). TEST acc
 - **Gate:** `run_checks.py --all`: backend 78 passed / 5 xfailed; TypeScript errors at baseline (admin 1, mobile 17).
 
 **Automated/build (2026-09-29):** backend `test_api.py` (live-server script, not pytest-collected, see `docs/testing.md`) 2 passed (0.68 s) · release JS bundle builds · backend compiles ·
-Jest 1 suite fails (Firebase ESM, pre-existing) · `tsc` mobile 17 / admin 1 errors (baseline, `.claude/hooks/tsc-baseline.json`).
+Jest 1 suite fails (Firebase ESM, pre-existing) · `tsc` mobile 17 / admin 1 errors (TypeScript error baseline, now `scripts/tsc-baseline.json`).
 `backend/tests/{smoke,edge}` and `scripts/run_checks.py` exist (added 2026-09-29, outside the test sessions above).
 
 **Test methods worth citing:** API scripts with barrier-synchronised threads for concurrency; emulator driven via adb; expired/invalid
@@ -131,7 +131,7 @@ Second fix round (numbered 1–11, separate from fixes 1–20 in §3). Results a
 | Live API regression | **64/64 passed** |
 | Critical emulator regression flows | passed |
 | Translation parity (`en.ts` / `hu.ts` / `tr.ts`) | **309 / 309 / 309** keys; HU/TR localization verified |
-| TypeScript baseline (`.claude/hooks/tsc-baseline.json`) | mobile **14**, admin **1** |
+| TypeScript baseline (`scripts/tsc-baseline.json`) | mobile **14**, admin **1** |
 | Final regression severity | **P0: 0 · P1: 0** (the one P1 was fixed by Fix 11) |
 
 **Behaviour verified in the final regression (TESTED):**
@@ -229,7 +229,7 @@ The orphan deletion REQUIRES CONFIRMATION. The regression test orphan `id_docume
     (all marked read on opening) and no pagination beyond 50. Notification rows are inserted with the DB's `CURRENT_TIMESTAMP` (DB server time zone,
     OBSERVED 15:09) while other tables store `utcnow()` (12:09 for the same moment). The app shows the notification time as stored (pre-existing, not changed).
 15. Admin approve/reject/suspend/cancel write no audit rows. The 22 `str(e)` paths listed in `docs/thesis.md`: a grep on 2026-10-07 found no client-facing `str(e)` in `backend/app`, and API errors are JSON (§4a); REQUIRES CONFIRMATION before claiming every path is sanitised.
-16. `backend/tests/CLAUDE.md` is referenced but doesn't exist; `test_api.py` creates a real test user on every run.
+16. `test_api.py` creates a real test user on every run.
 17. Pending claims never expire (NOT IMPLEMENTED); offers expire the same day (§4a). Deferred: notification localization, Google Sign-In button language, default app language.
 
 ## 8. NOT TESTED
@@ -277,5 +277,5 @@ This file stays canonical for status. The docs record code facts as of 2026-09-3
 ## 11. Git state
 
 Nothing committed on 2026-09-29. Uncommitted: the author's UI redesign (18 mobile files), the fixes in §3, `backend/migrations/`,
-`.claude/`, `CLAUDE.md`, `PROJECT_STATE.md`, `thesis_evidence/`. Never commit `.env`, `private_uploads/`, `app/static/uploads/`,
+development-tooling configuration, `PROJECT_STATE.md`, `thesis_evidence/`. Never commit `.env`, `private_uploads/`, `app/static/uploads/`,
 `firebase-service-account.json`, `db_before.txt`.

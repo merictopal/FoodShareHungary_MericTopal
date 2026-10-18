@@ -30,7 +30,7 @@ holds public images (offers, restaurant profiles, avatars).
 ## Rules
 - Documents are private (`id_documents/`, `student_ids/`). Public prefixes: `offer_images/`, `restaurant_profiles/`, `avatars/` only (bucket policy).
 - `/document-file/<token>` has no JWT on purpose: the signed, expiring token is the credential.
-- AWS changes and deleting the historical orphans need the user's explicit approval (CLAUDE.md).
+- AWS changes and deleting the historical orphans need the user's explicit approval (project rule).
 
 ## Known limitations
 - Re-uploading leaves the previous file in storage. This is where the 13 orphans in `id_documents/` came from.
